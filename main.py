@@ -9,7 +9,7 @@ BACKGROUND = (0, 0, 0)
 
 def main():
     pygame.init()
-    screen - pygame.display.set_mode((CANVAS_WIDTH, CANVAS_HEIGHT))
+    screen = pygame.display.set_mode((CANVAS_WIDTH, CANVAS_HEIGHT))
     pygame.display.set_caption("Escoba del 15")
     clock = pygame.time.Clock()
 
