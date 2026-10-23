@@ -41,3 +41,15 @@ To run the tests:
 ```bash
 pytest
 ```
+
+## Release Instructions
+
+Releases are built automatically by GitHub Actions (`.github/workflows/release.yml`). Pushing a tag that starts with `v` runs the tests, builds executables for Linux, Windows, and macOS, and attaches them to a GitHub Release.
+
+```bash
+git checkout main
+git pull
+
+git tag v0.1.0
+git push origin v0.1.0
+```
