@@ -1,4 +1,4 @@
-from escoba.cards import Suit, new_deck
+from escoba.core.cards import Suit, new_deck
 
 
 def test_deck_has_40_cards():
