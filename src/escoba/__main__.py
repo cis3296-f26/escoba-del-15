@@ -1,7 +1,7 @@
 """Escoba del 15: entry point. Opens the game window and runs the main loop."""
 import pygame
 
-from escoba.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
+from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
 
 # the game draws to a small fixed-size canvas (pixel-art resolution)
 SCREEN_WIDTH = 320
