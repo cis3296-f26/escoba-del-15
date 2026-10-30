@@ -1,8 +1,9 @@
 import random
 import pygame
 
-from escoba.core.gamestate import GameState
-from escoba.core.cards import new_deck
+from escoba.core.gamestate import GameState 
+from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
+from escoba.core.deck import Deck
 
 from escoba.graphics.render import RenderEngine
 from escoba.graphics.board import BoardRenderer
@@ -33,7 +34,12 @@ def main():
         for i in range(player_count)
     ]
 
-    clock = pygame.time.Clock()
+    # Temporary objects for testing
+    players = ["Player 1", "Player 2"]
+    deck = Deck()
+    table = []
+    # Create the GameState object
+    state = GameState(players, deck, table, 0)
 
     running = True
 
