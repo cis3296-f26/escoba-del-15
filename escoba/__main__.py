@@ -1,15 +1,15 @@
-"""Escoba del 15: entry point. Opens the game window and runs the main loop."""
 import random
-
 import pygame
 
-from escoba.core.gamestate import GameState 
-from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
+from escoba.core.gamestate import GameState
 from escoba.core.cards import new_deck
 
+from escoba.graphics.render import RenderEngine
+from escoba.graphics.board import BoardRenderer
+
 # the game draws to a small fixed-size canvas (pixel-art resolution)
-SCREEN_WIDTH = 320
-SCREEN_HEIGHT = 180
+SCREEN_WIDTH = 960
+SCREEN_HEIGHT = 640
 
 SCREEN_COLOR_BACKGROUND = (61, 153, 112) #Olive
 
@@ -17,10 +17,21 @@ FPS = 60
 
 def main():
     pygame.init()
+    
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Escoba del 15")
 
     render_engine = RenderEngine()
+    renderer = BoardRenderer()
+
+    deck = new_deck()
+    table_cards = deck[:4]
+
+    player_count = 4
+    player_hands = [
+        deck[4 + i * 3:7 + i * 3]
+        for i in range(player_count)
+    ]
 
     clock = pygame.time.Clock()
 
@@ -28,11 +39,6 @@ def main():
 
     players = ["You", "CPU"]
     state = GameState(players, new_deck(), [])
-
-    # temp cards to test rendering
-    cards = [
-        ((SCREEN_WIDTH - CARD_WIDTH) / 2, (SCREEN_HEIGHT - CARD_HEIGHT) / 2)
-        ]
 
     while running:
         # 1. handle input
@@ -48,15 +54,15 @@ def main():
             elif event.type == pygame.KEYDOWN and state.is_game_over() and event.key == pygame.K_r:
                 state = GameState(players, new_deck(), [])
 
-        # 2.
-        # begin frame
-        screen.fill(SCREEN_COLOR_BACKGROUND)
-
-        # 3. render the current game state
         if state.is_game_over():
             render_engine.draw_end_board(screen, state)
         else:
-            render_engine.draw_cards(screen, cards)
+            renderer.draw(
+                screen,
+                table_cards,
+                player_hands,
+                len(deck) - 4 - player_count * 3
+                )
 
         # swap buffers
         pygame.display.flip()
