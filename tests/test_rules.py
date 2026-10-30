@@ -15,7 +15,7 @@ def test_face_card_values():
 
 
 def test_deck_values_cover_1_to_10():
-    assert sorted({card_value(card) for card in Deck()}) == list(range(1, 11))
+    assert sorted({card_value(card) for card in Deck().cards}) == list(range(1, 11))
 
 
 def test_no_captures_on_empty_table():
