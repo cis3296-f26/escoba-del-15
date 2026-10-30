@@ -1,7 +1,9 @@
 """Escoba del 15: entry point. Opens the game window and runs the main loop."""
 import pygame
 
+from escoba.core.gamestate import GameState 
 from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
+from escoba.core.cards import new_deck
 
 # the game draws to a small fixed-size canvas (pixel-art resolution)
 SCREEN_WIDTH = 320
@@ -21,6 +23,14 @@ def main():
     clock = pygame.time.Clock()
 
     running = True
+
+    # Temporary objects for testing
+    players = ["Player 1", "Player 2"]
+    deck = new_deck()
+    table = []
+    # Create the GameState object
+    state = GameState(players, deck, table, 0)
+
 
     # temp cards to test rendering
     cards = [
