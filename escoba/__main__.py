@@ -1,4 +1,6 @@
 """Escoba del 15: entry point. Opens the game window and runs the main loop."""
+import random
+
 import pygame
 
 from escoba.core.gamestate import GameState 
@@ -24,13 +26,8 @@ def main():
 
     running = True
 
-    # Temporary objects for testing
-    players = ["Player 1", "Player 2"]
-    deck = new_deck()
-    table = []
-    # Create the GameState object
-    state = GameState(players, deck, table, 0)
-
+    players = ["You", "CPU"]
+    state = GameState(players, new_deck(), [])
 
     # temp cards to test rendering
     cards = [
@@ -44,12 +41,22 @@ def main():
                 running = False
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                 running = False
+            
+            # TODO: remove this temp testing key
+            elif event.type == pygame.KEYDOWN and not state.is_game_over() and event.key == pygame.K_n:
+                state.add_round_scores({player: random.randint(0, 6) for player in players})
+            elif event.type == pygame.KEYDOWN and state.is_game_over() and event.key == pygame.K_r:
+                state = GameState(players, new_deck(), [])
 
         # 2.
         # begin frame
         screen.fill(SCREEN_COLOR_BACKGROUND)
 
-        render_engine.draw_cards(screen, cards)
+        # 3. render the current game state
+        if state.is_game_over():
+            render_engine.draw_end_board(screen, state)
+        else:
+            render_engine.draw_cards(screen, cards)
 
         # swap buffers
         pygame.display.flip()
