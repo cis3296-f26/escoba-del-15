@@ -1,11 +1,10 @@
-"""Escoba del 15: entry point. Opens the game window and runs the main loop."""
 import random
-
 import pygame
 
-from escoba.core.gamestate import GameState 
-from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
-from escoba.core.cards import new_deck
+from escoba.core.cards import Card, Suit, new_deck
+from escoba.core.gamestate import GameState
+from escoba.graphics.cards import CardRenderer
+from escoba.graphics.render import RenderEngine
 
 # the game draws to a small fixed-size canvas (pixel-art resolution)
 SCREEN_WIDTH = 320
@@ -17,10 +16,12 @@ FPS = 60
 
 def main():
     pygame.init()
+    
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Escoba del 15")
 
     render_engine = RenderEngine()
+    card_renderer = CardRenderer()
 
     clock = pygame.time.Clock()
 
@@ -28,11 +29,6 @@ def main():
 
     players = ["You", "CPU"]
     state = GameState(players, new_deck(), [])
-
-    # temp cards to test rendering
-    cards = [
-        ((SCREEN_WIDTH - CARD_WIDTH) / 2, (SCREEN_HEIGHT - CARD_HEIGHT) / 2)
-        ]
 
     while running:
         # 1. handle input
@@ -56,7 +52,24 @@ def main():
         if state.is_game_over():
             render_engine.draw_end_board(screen, state)
         else:
-            render_engine.draw_cards(screen, cards)
+            card_renderer.draw(
+                screen, 
+                Card(Suit.OROS, 7), 
+                (50, 50)
+            )
+
+            card_renderer.draw(
+                screen, 
+                Card(Suit.OROS, 7), 
+                (150, 50),
+                face_up=False
+            )
+        
+            card_renderer.draw(
+                screen, 
+                None, 
+                (250, 50)
+            )
 
         # swap buffers
         pygame.display.flip()
