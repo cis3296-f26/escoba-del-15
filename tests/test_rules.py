@@ -1,5 +1,5 @@
 from escoba.cards import Card, Suit, new_deck
-from escoba.rules import card_value, find_captures
+from escoba.rules import PlayerRound, card_value, find_captures, score_round
 
 
 def test_number_cards_keep_their_value():
@@ -52,3 +52,70 @@ def test_no_capture_when_nothing_adds_up():
     played = Card(Suit.OROS, 1)
     table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 3)]
     assert find_captures(played, table) == []
+
+
+def test_score_no_players():
+    assert score_round([]) == []
+
+
+def test_score_one_point_per_escoba():
+    players = [PlayerRound([], escobas=3), PlayerRound([], escobas=0)]
+    assert score_round(players) == [3, 0]
+
+
+def test_score_most_cards():
+    players = [
+        PlayerRound([Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)]),
+        PlayerRound([Card(Suit.BASTOS, 1)]),
+    ]
+    assert score_round(players) == [1, 0]
+
+
+def test_score_most_cards_tied():
+    players = [
+        PlayerRound([Card(Suit.COPAS, 1)]),
+        PlayerRound([Card(Suit.BASTOS, 1)]),
+    ]
+    assert score_round(players) == [0, 0]
+
+
+def test_score_most_oros():
+    # same number of cards, but player 1 has more oros
+    players = [
+        PlayerRound([Card(Suit.OROS, 1), Card(Suit.OROS, 2)]),
+        PlayerRound([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
+    ]
+    assert score_round(players) == [1, 0]
+
+
+def test_score_most_oros_tied():
+    players = [
+        PlayerRound([Card(Suit.OROS, 1), Card(Suit.COPAS, 2)]),
+        PlayerRound([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
+    ]
+    assert score_round(players) == [0, 0]
+
+
+def test_score_siete_de_velo():
+    # player 1 gets velo + most oros + most sevens, player 2 nothing
+    players = [
+        PlayerRound([Card(Suit.OROS, 7)]),
+        PlayerRound([Card(Suit.COPAS, 1)]),
+    ]
+    assert score_round(players) == [3, 0]
+
+
+def test_score_most_sevens():
+    players = [
+        PlayerRound([Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)]),
+        PlayerRound([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
+    ]
+    assert score_round(players) == [1, 0]
+
+
+def test_score_most_sevens_tied():
+    players = [
+        PlayerRound([Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)]),
+        PlayerRound([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
+    ]
+    assert score_round(players) == [0, 0]
