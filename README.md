@@ -21,7 +21,7 @@ pip install -r requirements.txt
 You can run the game straight from source with no build step. To make a standalone executable with PyInstaller:
 
 ```bash
-pyinstaller --onefile --windowed --name escoba main.py
+pyinstaller --onefile --windowed --paths . --name escoba escoba/__main__.py
 ```
 
 The executable is written to `dist/`.
@@ -31,7 +31,7 @@ The executable is written to `dist/`.
 From the project root, with the virtual environment active:
 
 ```bash
-python main.py
+python -m escoba
 ```
 
 A game window opens. To quit, close the window or press **Esc**.
@@ -39,5 +39,5 @@ A game window opens. To quit, close the window or press **Esc**.
 To run the tests:
 
 ```bash
-pytest
+python -m pytest
 ```
