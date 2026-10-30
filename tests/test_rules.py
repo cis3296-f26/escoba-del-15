@@ -1,5 +1,6 @@
-from escoba.cards import Card, Suit, new_deck
-from escoba.rules import PlayerRound, card_value, find_captures, score_round
+from escoba.core.cards import Card, Suit
+from escoba.core.deck import Deck
+from escoba.core.rules import PlayerRound, card_value, find_captures, score_round
 
 
 def test_number_cards_keep_their_value():
@@ -14,7 +15,7 @@ def test_face_card_values():
 
 
 def test_deck_values_cover_1_to_10():
-    assert sorted({card_value(card) for card in new_deck()}) == list(range(1, 11))
+    assert sorted({card_value(card) for card in Deck()}) == list(range(1, 11))
 
 
 def test_no_captures_on_empty_table():

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from itertools import combinations
 
-from escoba.cards import Card, Suit
+from escoba.core.cards import Card, Suit
 
 TARGET_SUM = 15
 
