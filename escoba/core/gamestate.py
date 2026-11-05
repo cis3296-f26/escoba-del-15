@@ -31,3 +31,14 @@ class GameState:
 
     def is_game_over(self):
         return self.winner() is not None
+
+   
+    def get_current_player(self):
+        return self.players[self.turn]
+
+    def deal_cards(self):
+        # Each player receives 3 cards
+        for _ in range(3):
+            for player in self.players:
+                card = self.deck.draw()
+                player.add_card(card)

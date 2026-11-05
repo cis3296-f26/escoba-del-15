@@ -1,6 +1,7 @@
 import random
 import pygame
 
+from escoba.core.player import Player
 from escoba.core.gamestate import GameState 
 from escoba.graphics.render import RenderEngine, CARD_WIDTH, CARD_HEIGHT
 from escoba.core.deck import Deck
@@ -16,35 +17,45 @@ SCREEN_COLOR_BACKGROUND = (61, 153, 112) #Olive
 
 FPS = 60
 
+
+def create_game():
+    # Create players
+    players = [
+        Player("You"),
+        Player("CPU", is_cpu=True)
+    ]
+
+    # Create and shuffle deck
+    deck = Deck()
+    deck.shuffle()
+
+    # Deal four cards to the table
+    table = [deck.draw() for _ in range(4)]
+
+    # Create GameState
+    state = GameState(players, deck, table)
+
+    # Deal three cards to each player
+    state.deal_cards()
+
+    return state
+
+
 def main():
     pygame.init()
     
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SCALED)
     pygame.display.set_caption("Escoba del 15")
 
+    clock = pygame.time.Clock()
+
     render_engine = RenderEngine()
     renderer = BoardRenderer()
 
-    deck = new_deck()
-    table_cards = deck[:4]
-
-    player_count = 4
-    player_hands = [
-        deck[4 + i * 3:7 + i * 3]
-        for i in range(player_count)
-    ]
-
-    # Temporary objects for testing
-    players = ["Player 1", "Player 2"]
-    deck = Deck()
-    table = []
-    # Create the GameState object
-    state = GameState(players, deck, table, 0)
+    # Initialize GameState
+    state = create_game()
 
     running = True
-
-    players = ["You", "CPU"]
-    state = GameState(players, new_deck(), [])
 
     while running:
         # 1. handle input
@@ -65,10 +76,10 @@ def main():
         else:
             renderer.draw(
                 screen,
-                table_cards,
-                player_hands,
-                len(deck) - 4 - player_count * 3
-                )
+                state.table,
+                [player.hand for player in state.players],
+                len(state.deck)
+            )
 
         # swap buffers
         pygame.display.flip()
