@@ -1,7 +1,8 @@
-from dataclasses import dataclass
 from itertools import combinations
 
 from escoba.core.cards import Card, Suit
+from escoba.core.deck import Deck
+from escoba.core.player import Player
 
 TARGET_SUM = 15
 
@@ -52,12 +53,40 @@ def play_card(state, card: Card, capture=()) -> None:
     state.next_turn()
 
 
-# temporary : this will most likely be incorporated
-#    into a player class in the future
-@dataclass
-class PlayerRound:
-    captured: list[Card]
-    escobas: int = 0
+def start_round(state) -> None:
+    # fresh shuffled deck, 4 cards on the table, 3 to each player
+    state.deck = Deck()
+    state.deck.shuffle()
+    state.table = [state.deck.draw() for _ in range(4)]
+    state.last_capturer = None
+
+    for player in state.players:
+        player.captured = []
+        player.escobas = 0
+
+    state.deal_cards()
+
+
+def end_turn(state) -> None:
+    # call after every play_card
+    # once all hands are empty, deal again or finish the round
+    if any(player.hand for player in state.players):
+        return
+
+    if len(state.deck) > 0:
+        state.deal_cards()
+    else:
+        end_round(state)
+
+
+def end_round(state) -> None:
+    # leftover table cards go to whoever captured last (doesn't count as an escoba)
+    if state.last_capturer is not None:
+        state.last_capturer.add_captured(state.table)
+        state.table = []
+
+    points = score_round(state.players)
+    state.add_round_scores(dict(zip(state.players, points)))
 
 
 def award_most(points: list[int], counts: list[int]) -> None:
@@ -67,7 +96,7 @@ def award_most(points: list[int], counts: list[int]) -> None:
         points[counts.index(best)] += 1
 
 
-def score_round(players: list[PlayerRound]) -> list[int]:
+def score_round(players: list[Player]) -> list[int]:
     # one escoba = one point - initialize w escobas
     points = [player.escobas for player in players]
 

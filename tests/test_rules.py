@@ -2,7 +2,21 @@ from escoba.core.cards import Card, Suit
 from escoba.core.deck import Deck
 from escoba.core.gamestate import GameState
 from escoba.core.player import Player
-from escoba.core.rules import PlayerRound, card_value, find_captures, play_card, score_round
+from escoba.core.rules import (
+    card_value,
+    end_turn,
+    find_captures,
+    play_card,
+    score_round,
+    start_round,
+)
+
+
+def make_player(captured, escobas=0):
+    player = Player("p")
+    player.captured = list(captured)
+    player.escobas = escobas
+    return player
 
 
 def test_number_cards_keep_their_value():
@@ -62,22 +76,22 @@ def test_score_no_players():
 
 
 def test_score_one_point_per_escoba():
-    players = [PlayerRound([], escobas=3), PlayerRound([], escobas=0)]
+    players = [make_player([], escobas=3), make_player([], escobas=0)]
     assert score_round(players) == [3, 0]
 
 
 def test_score_most_cards():
     players = [
-        PlayerRound([Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)]),
-        PlayerRound([Card(Suit.BASTOS, 1)]),
+        make_player([Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)]),
+        make_player([Card(Suit.BASTOS, 1)]),
     ]
     assert score_round(players) == [1, 0]
 
 
 def test_score_most_cards_tied():
     players = [
-        PlayerRound([Card(Suit.COPAS, 1)]),
-        PlayerRound([Card(Suit.BASTOS, 1)]),
+        make_player([Card(Suit.COPAS, 1)]),
+        make_player([Card(Suit.BASTOS, 1)]),
     ]
     assert score_round(players) == [0, 0]
 
@@ -85,16 +99,16 @@ def test_score_most_cards_tied():
 def test_score_most_oros():
     # same number of cards, but player 1 has more oros
     players = [
-        PlayerRound([Card(Suit.OROS, 1), Card(Suit.OROS, 2)]),
-        PlayerRound([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
+        make_player([Card(Suit.OROS, 1), Card(Suit.OROS, 2)]),
+        make_player([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
     ]
     assert score_round(players) == [1, 0]
 
 
 def test_score_most_oros_tied():
     players = [
-        PlayerRound([Card(Suit.OROS, 1), Card(Suit.COPAS, 2)]),
-        PlayerRound([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
+        make_player([Card(Suit.OROS, 1), Card(Suit.COPAS, 2)]),
+        make_player([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
     ]
     assert score_round(players) == [0, 0]
 
@@ -102,24 +116,24 @@ def test_score_most_oros_tied():
 def test_score_siete_de_velo():
     # player 1 gets velo + most oros + most sevens, player 2 nothing
     players = [
-        PlayerRound([Card(Suit.OROS, 7)]),
-        PlayerRound([Card(Suit.COPAS, 1)]),
+        make_player([Card(Suit.OROS, 7)]),
+        make_player([Card(Suit.COPAS, 1)]),
     ]
     assert score_round(players) == [3, 0]
 
 
 def test_score_most_sevens():
     players = [
-        PlayerRound([Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)]),
-        PlayerRound([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
+        make_player([Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)]),
+        make_player([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
     ]
     assert score_round(players) == [1, 0]
 
 
 def test_score_most_sevens_tied():
     players = [
-        PlayerRound([Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)]),
-        PlayerRound([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
+        make_player([Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)]),
+        make_player([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
     ]
     assert score_round(players) == [0, 0]
 
@@ -169,3 +183,71 @@ def test_clearing_table_is_escoba():
 
     assert state.table == []
     assert state.players[0].escobas == 1
+
+
+def test_end_turn_waits_while_cards_in_hand():
+    state = make_state([Card(Suit.OROS, 1)], [])
+
+    end_turn(state)
+
+    assert len(state.players[0].hand) == 1
+    assert len(state.players[1].hand) == 0
+    assert len(state.deck) == 40
+
+
+def test_end_turn_redeals_when_hands_empty():
+    state = make_state([], [])
+
+    end_turn(state)
+
+    assert all(len(player.hand) == 3 for player in state.players)
+    assert len(state.deck) == 34
+
+
+def test_end_round_gives_table_to_last_capturer_and_scores():
+    velo = Card(Suit.OROS, 7)
+    leftover = Card(Suit.COPAS, 1)
+    state = make_state([], [leftover])
+    state.deck.cards = []
+    you, cpu = state.players
+    you.captured = [velo]
+    state.last_capturer = you
+
+    end_turn(state)
+
+    assert state.table == []
+    assert set(you.captured) == {velo, leftover}
+    # most cards + most oros + most sevens + siete de velo
+    assert state.scores == {you: 4, cpu: 0}
+
+
+def test_start_round_resets_and_deals():
+    state = make_state([], [])
+    state.players[0].captured = [Card(Suit.OROS, 1)]
+    state.players[0].escobas = 2
+
+    start_round(state)
+
+    assert len(state.table) == 4
+    assert all(len(player.hand) == 3 for player in state.players)
+    assert len(state.deck) == 30
+    assert state.players[0].captured == []
+    assert state.players[0].escobas == 0
+
+
+def test_full_round_keeps_all_40_cards():
+    state = make_state([], [])
+    start_round(state)
+
+    # everyone just plays their first card and takes the first capture they can
+    while any(player.hand for player in state.players):
+        player = state.get_current_player()
+        card = player.hand[0]
+        captures = find_captures(card, state.table)
+        play_card(state, card, captures[0] if captures else ())
+        end_turn(state)
+
+    captured = sum(len(player.captured) for player in state.players)
+    assert len(state.deck) == 0
+    assert captured + len(state.table) == 40
+    assert sum(state.scores.values()) > 0
