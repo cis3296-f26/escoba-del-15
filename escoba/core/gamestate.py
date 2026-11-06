@@ -7,6 +7,8 @@ class GameState:
         self.deck = deck
         self.table = table
         self.turn = turn
+        # whoever captured most recently takes the leftover table at round end
+        self.last_capturer = None
         # running game total for every player
         self.scores = {player: 0 for player in players}
         

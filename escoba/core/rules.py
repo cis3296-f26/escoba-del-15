@@ -31,6 +31,27 @@ def find_captures(played: Card, table: list[Card]) -> list[tuple[Card, ...]]:
     return captures
 
 
+def play_card(state, card: Card, capture=()) -> None:
+    # current player plays a card, either capturing `capture` or leaving it on the table
+    # assumes the move is legal (capture should come from find_captures)
+    player = state.get_current_player()
+    player.remove_card(card)
+
+    if capture:
+        for taken in capture:
+            state.table.remove(taken)
+        player.add_captured([card, *capture])
+        state.last_capturer = player
+
+        # clearing the table is an escoba
+        if not state.table:
+            player.escobas += 1
+    else:
+        state.table.append(card)
+
+    state.next_turn()
+
+
 # temporary : this will most likely be incorporated
 #    into a player class in the future
 @dataclass
