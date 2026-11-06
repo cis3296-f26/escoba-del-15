@@ -1,6 +1,6 @@
 from escoba.core.cards import Card, Suit
 from escoba.core.deck import Deck
-from escoba.core.gamestate import GameState
+from escoba.core.game import Game
 from escoba.core.player import Player
 from escoba.core.rules import (
     card_value,
@@ -142,7 +142,7 @@ def make_state(hand, table):
     # two players, the first one is up and holds `hand`
     you, cpu = Player("You"), Player("CPU", is_cpu=True)
     you.hand = list(hand)
-    return GameState([you, cpu], Deck(), list(table))
+    return Game([you, cpu], Deck(), list(table))
 
 
 def test_play_without_capture_puts_card_on_table():
