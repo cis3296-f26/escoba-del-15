@@ -21,7 +21,7 @@ pip install -r requirements.txt
 You can run the game straight from source with no build step. To make a standalone executable with PyInstaller:
 
 ```bash
-pyinstaller --onefile --windowed --paths . --name escoba escoba/__main__.py
+pyinstaller --onefile --windowed --paths . --add-data "assets/cards:assets/cards" --name escoba escoba/__main__.py
 ```
 
 The executable is written to `dist/`.
@@ -41,3 +41,7 @@ To run the tests:
 ```bash
 pytest
 ```
+
+## Credits
+
+Card art by [jcanabal, Spanish Deck - Pixel Art](https://jcanabal.itch.io/spanish-deck-pixel-art).
