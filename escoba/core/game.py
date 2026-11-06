@@ -1,7 +1,13 @@
+from enum import Enum, auto
+
 WINNING_SCORE = 21
 
+class GameState(Enum):
+    START = auto()
+    PLAY = auto()
+    GAME_OVER = auto()
 
-class GameState:
+class Game:
     def __init__(self, players, deck, table, turn=0):
         self.players = players
         self.deck = deck
@@ -11,8 +17,8 @@ class GameState:
         self.last_capturer = None
         # running game total for every player
         self.scores = {player: 0 for player in players}
+        self.state = GameState.START
         
-
     def next_turn(self):
         self.turn = (self.turn + 1) % len(self.players)
 

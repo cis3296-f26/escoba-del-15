@@ -1,6 +1,4 @@
-import pytest
-
-from escoba.core.gamestate import GameState
+from escoba.core.game import Game
 from escoba.core.deck import Deck
 from escoba.core.player import Player
 
@@ -16,7 +14,7 @@ def test_gamestate_initialization():
     deck = Deck()
     table = []
 
-    state = GameState(players, deck, table)
+    state = Game(players, deck, table)
 
     assert state.players is players
     assert state.deck is deck
@@ -25,7 +23,7 @@ def test_gamestate_initialization():
 
 
 def test_next_turn():
-    state = GameState(
+    state = Game(
         players=["Player 1", "Player 2"],
         deck=Deck(),
         table=[]
