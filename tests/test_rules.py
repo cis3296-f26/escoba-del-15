@@ -1,6 +1,8 @@
 from escoba.core.cards import Card, Suit
 from escoba.core.deck import Deck
-from escoba.core.rules import PlayerRound, card_value, find_captures, score_round
+from escoba.core.gamestate import GameState
+from escoba.core.player import Player
+from escoba.core.rules import PlayerRound, card_value, find_captures, play_card, score_round
 
 
 def test_number_cards_keep_their_value():
@@ -120,3 +122,50 @@ def test_score_most_sevens_tied():
         PlayerRound([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
     ]
     assert score_round(players) == [0, 0]
+
+
+def make_state(hand, table):
+    # two players, the first one is up and holds `hand`
+    you, cpu = Player("You"), Player("CPU", is_cpu=True)
+    you.hand = list(hand)
+    return GameState([you, cpu], Deck(), list(table))
+
+
+def test_play_without_capture_puts_card_on_table():
+    played = Card(Suit.OROS, 2)
+    state = make_state([played], [Card(Suit.COPAS, 3)])
+    you = state.players[0]
+
+    play_card(state, played)
+
+    assert played in state.table
+    assert you.hand == []
+    assert you.captured == []
+    assert state.turn == 1
+
+
+def test_play_with_capture_takes_cards():
+    played = Card(Suit.OROS, 5)
+    rey = Card(Suit.COPAS, 12)
+    three = Card(Suit.BASTOS, 3)
+    state = make_state([played], [rey, three])
+    you = state.players[0]
+
+    play_card(state, played, [rey])
+
+    assert state.table == [three]
+    assert set(you.captured) == {played, rey}
+    assert you.escobas == 0
+    assert state.last_capturer is you
+    assert state.turn == 1
+
+
+def test_clearing_table_is_escoba():
+    played = Card(Suit.OROS, 1)
+    table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 4), Card(Suit.BASTOS, 10)]
+    state = make_state([played], table)
+
+    play_card(state, played, table)
+
+    assert state.table == []
+    assert state.players[0].escobas == 1
