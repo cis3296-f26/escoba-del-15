@@ -1,131 +1,120 @@
 from itertools import combinations
 
-from escoba.core.cards import Card, Suit
+from escoba.core.card import Card, Suit, SIETE_DE_VELO
 from escoba.core.deck import Deck
-from escoba.core.player import Player
+from escoba.core.game import Game, PlayerState
+from escoba.core.result import GameResult
 
+WINNING_SCORE = 21
 TARGET_SUM = 15
 
-# 10, 11, 12 count as 8, 9, 10
-# temp: should eventually be a part of the Card class
-FACE_CARD_VALUES = {10: 8, 11: 9, 12: 10}
-
-# temp: this constant should eventually be in the Card Class
-SIETE_DE_VELO = Card(Suit.OROS, 7)
-
-
-def card_value(card: Card) -> int:
-    return FACE_CARD_VALUES.get(card.rank, card.rank)
-
-
 def find_captures(played: Card, table: list[Card]) -> list[tuple[Card, ...]]:
-    needed = TARGET_SUM - card_value(played)
-
+    needed = TARGET_SUM - played.value
     captures = []
 
-    # try every non-empty group of table cards
     for size in range(1, len(table) + 1):
         for group in combinations(table, size):
-            if sum(card_value(card) for card in group) == needed:
+            if sum(card.value for card in group) == needed:
                 captures.append(group)
 
     return captures
 
+def deal_cards(game: Game) -> None:
+    for _ in range(3):
+        for player in game.players:
+            game.player_states[player.id].hand.append(game.deck.draw())
 
-def play_card(state, card: Card, capture=()) -> None:
-    # current player plays a card, either capturing `capture` or leaving it on the table
+def play_card(game: Game, card: Card, capture=()) -> None:
     # assumes the move is legal (capture should come from find_captures)
-    player = state.get_current_player()
-    player.remove_card(card)
+    state = game.player_states[game.current_player_id]
+    state.hand.remove(card)
 
     if capture:
         for taken in capture:
-            state.table.remove(taken)
-        player.add_captured([card, *capture])
-        state.last_capturer = player
+            game.table.remove(taken)
+        state.captured.extend((card, *capture))
+        game.last_capturer = game.current_player_id
 
-        # clearing the table is an escoba
-        if not state.table:
-            player.escobas += 1
+        if not game.table:
+            state.escobas += 1
     else:
-        state.table.append(card)
+        game.table.append(card)
 
-    state.next_turn()
+    game.turn = (game.turn + 1) % len(game.players)
 
+def start_round(game: Game) -> None:
+    game.deck = Deck().shuffle()
+    game.table = [game.deck.draw() for _ in range(4)]
+    game.last_capturer = None
 
-def start_round(state) -> None:
-    # fresh shuffled deck, 4 cards on the table, 3 to each player
-    state.deck = Deck()
-    state.deck.shuffle()
-    state.table = [state.deck.draw() for _ in range(4)]
-    state.last_capturer = None
+    game.player_states = {
+        player.id: PlayerState(score=game.player_states[player.id].score)
+        for player in game.players
+    }
 
-    for player in state.players:
-        player.captured = []
-        player.escobas = 0
+    deal_cards(game)
 
-    state.deal_cards()
+def end_turn(game: Game) -> GameResult | None:
+    if any(state.hand for state in game.player_states.values()):
+        return None
 
+    if len(game.deck) > 0:
+        deal_cards(game)
+        return None
 
-def end_turn(state) -> None:
-    # call after every play_card
-    # once all hands are empty, deal again or finish the round
-    if any(player.hand for player in state.players):
-        return
+    return end_round(game)
 
-    if len(state.deck) > 0:
-        state.deal_cards()
-    else:
-        end_round(state)
+def end_round(game: Game) -> GameResult | None:
+    if game.last_capturer is not None:
+        game.player_states[game.last_capturer].captured.extend(game.table)
+        game.table = []
 
+    points = score_round(game)
+    for player, earned in zip(game.players, points):
+        game.player_states[player.id].score += earned
 
-def end_round(state) -> None:
-    # leftover table cards go to whoever captured last (doesn't count as an escoba)
-    if state.last_capturer is not None:
-        state.last_capturer.add_captured(state.table)
-        state.table = []
-
-    points = score_round(state.players)
-    state.add_round_scores(dict(zip(state.players, points)))
-
+    return finish_game(game)
 
 def award_most(points: list[int], counts: list[int]) -> None:
-    # +1 to whoever has the most, nobody gets it on a tie (or if everyone has 0)
     best = max(counts, default=0)
     if best > 0 and counts.count(best) == 1:
         points[counts.index(best)] += 1
 
+def score_round(game: Game) -> list[int]:
+    states = [game.player_states[player.id] for player in game.players]
+    points = [state.escobas for state in states]
 
-def score_round(players: list[Player]) -> list[int]:
-    # one escoba = one point - initialize w escobas
-    points = [player.escobas for player in players]
-
-    # count each player's cards, oros, sevens
-    # keep them in a list in the correct order
     card_counts = []
     oros_counts = []
     seven_counts = []
 
-    for player in players:
-        oros = 0
-        sevens = 0
-
-        for card in player.captured:
-            if card.suit == Suit.OROS:
-                oros += 1
-            if card.rank == 7:
-                sevens += 1
-
-        card_counts.append(len(player.captured))
-        oros_counts.append(oros)
-        seven_counts.append(sevens)
+    for state in states:
+        card_counts.append(len(state.captured))
+        oros_counts.append(sum(card.suit == Suit.OROS for card in state.captured))
+        seven_counts.append(sum(card.rank == 7 for card in state.captured))
 
     award_most(points, card_counts)
     award_most(points, oros_counts)
     award_most(points, seven_counts)
 
-    for i, player in enumerate(players):
-        if SIETE_DE_VELO in player.captured:
+    for i, state in enumerate(states):
+        if SIETE_DE_VELO in state.captured:
             points[i] += 1
 
     return points
+
+def finish_game(game: Game) -> GameResult | None:
+    scores = tuple(
+        (player.id, game.player_states[player.id].score) for player in game.players
+    )
+    best = max(score for _, score in scores)
+    leaders = [player_id for player_id, score in scores if score == best]
+
+    if best < WINNING_SCORE or len(leaders) != 1:
+        return None
+
+    return GameResult(
+        players=game.players,
+        winner_id=leaders[0],
+        scores=scores,
+    )

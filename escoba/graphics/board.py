@@ -1,72 +1,62 @@
-import pygame
-
-from escoba.graphics.cards import CardRenderer, CARD_WIDTH, CARD_HEIGHT
-
-TABLE_COLOR = (61, 153, 112) #Olive
+from escoba.graphics.cards import draw_card, CARD_WIDTH, CARD_HEIGHT
 
 CARD_SPACING = 8
-TABLE_PADDING = 20
+EDGE_PADDING = 28
+DECK_GAP = 24
+HAND_SLOTS = 3
+TABLE_SLOTS = 4
 
-class BoardRenderer:
-    def __init__(self):
-        self.card_renderer = CardRenderer()
+def draw_card_row(screen, resources, cards, x, y, face_up, slots):
+    cards = list(cards)
+    if len(cards) < slots:
+        cards = cards + [None] * (slots - len(cards))
+    if not cards:
+        return
 
-    def _draw_hand(self, screen, cards, x, y, face_up, vertical=False):
-        if not cards: return
+    total = len(cards) * CARD_WIDTH + (len(cards) - 1) * CARD_SPACING
+    start = x - total / 2
 
-        card_size = CARD_HEIGHT if vertical else CARD_WIDTH
-        spacing = card_size + CARD_SPACING
-        total_size = len(cards) * card_size + (len(cards) - 1) * CARD_SPACING
+    for i, card in enumerate(cards):
+        pos = (int(start + i * (CARD_WIDTH + CARD_SPACING)), int(y))
+        draw_card(screen, resources, card, pos, face_up)
 
-        center = y if vertical else x
-        start = center - total_size // 2
+def draw_board(screen, resources, table_cards, player_hands, deck_count):
+    width, height = screen.get_size()
+    center_x, center_y = width // 2, height // 2
 
-        for i, card in enumerate(cards):
-            offset = start + i * spacing
-            position = (x, offset) if vertical else (offset, y)
+    table_y = center_y - CARD_HEIGHT // 2
+    table_width = TABLE_SLOTS * CARD_WIDTH + (TABLE_SLOTS - 1) * CARD_SPACING
+    show_deck = deck_count > 0
+    group_width = table_width + (DECK_GAP + CARD_WIDTH if show_deck else 0)
+    group_left = center_x - group_width / 2
 
-            self.card_renderer.draw(screen, card, position, face_up)
+    draw_card_row(
+        screen, resources, table_cards,
+        group_left + table_width / 2, table_y,
+        face_up=True, slots=TABLE_SLOTS
+    )
 
-    def draw(self, screen, table_cards, player_hands, deck_count):
-        screen.fill(TABLE_COLOR)
-
-        width, height = screen.get_size()
-        center_x, center_y = width // 2, height // 2
-
-        # Cards on the table
-        self._draw_hand(
-            screen,
-            table_cards,
-            center_x,
-            center_y - CARD_HEIGHT // 2,
-            face_up=True
+    if show_deck:
+        screen.blit(
+            resources.card_back,
+            (int(group_left + table_width + DECK_GAP), table_y)
         )
 
-        # Remaining deck
-        if deck_count > 0:
-            self.card_renderer.draw(
-                screen,
-                None,
-                (center_x + 160, center_y - CARD_HEIGHT // 2),
-                face_up=False
-            )
+    draw_card_row(
+        screen, resources, player_hands[0], center_x,
+        height - CARD_HEIGHT - EDGE_PADDING,
+        face_up=False, slots=HAND_SLOTS
+    )
 
-        # Player positions: bottom, top, left, right
-        positions = [
-            (center_x, height - CARD_HEIGHT - TABLE_PADDING),
-            (center_x, TABLE_PADDING),
-            (TABLE_PADDING, center_y),
-            (width - CARD_WIDTH - TABLE_PADDING, center_y)
-        ]
+    opponents = player_hands[1:]
+    n = len(opponents)
+    if n == 0:
+        return
 
-        for i, hand in enumerate(player_hands):
-            x, y = positions[i]
-
-            self._draw_hand(
-                screen,
-                hand,
-                x,
-                y,
-                face_up=False,
-                vertical=i >= 2
-            )
+    segment = width / n
+    for i, hand in enumerate(opponents):
+        draw_card_row(
+            screen, resources, hand, 
+            (i + 0.5) * segment, EDGE_PADDING, 
+            face_up=False, slots=HAND_SLOTS
+        )

@@ -1,83 +1,73 @@
 import pygame
 
-from escoba.core.game import Game, GameState
+from escoba.core.game import Game
+from escoba.core.result import GameResult
 
-from escoba.graphics.board import BoardRenderer
+from escoba.graphics.board import draw_board
+from escoba.graphics.colors import WHITE, NAVY, SILVER, OLIVE
 
-CARD_WIDTH = 100
-CARD_HEIGHT = 150
+POPUP_PADDING = 32
+POPUP_LINE_SPACING = 40
+POPUP_TITLE_GAP = 24
+POPUP_MIN_WIDTH = 460
+POPUP_BORDER_RADIUS = 16
 
-CARD_COLOR_BORDER = (17, 17, 17) #Black
-CARD_COLOR_FILL = (255, 255, 255) #White
+def create_window(width, height, title):
+    pygame.init()
+    screen = pygame.display.set_mode((width, height), pygame.SCALED)
+    pygame.display.set_caption(title)
+    return screen
 
-TABLE_COLOR = (61, 153, 112) #Olive
+def draw_popup(screen, resources, title, lines):
+    # sized to the text, then centered on the screen
+    title_surface = resources.title_font.render(title, True, WHITE)
+    line_surfaces = [resources.text_font.render(line, True, WHITE) for line in lines]
 
-class RenderEngine:
-    def __init__(self):
-        self.text_font = pygame.font.Font(None, 32)
-        self.title_font = pygame.font.Font(None, 64)
+    content_width = max(s.get_width() for s in [title_surface, *line_surfaces])
+    popup = pygame.Rect(
+        0,
+        0,
+        max(POPUP_MIN_WIDTH, content_width + POPUP_PADDING * 2),
+        POPUP_PADDING * 2 + title_surface.get_height() + POPUP_TITLE_GAP + len(line_surfaces) * POPUP_LINE_SPACING
+    )
+    popup.center = screen.get_rect().center
 
-        self.board_renderer = BoardRenderer()
+    pygame.draw.rect(screen, NAVY, popup, border_radius=POPUP_BORDER_RADIUS)
+    pygame.draw.rect(screen, SILVER, popup, width=2, border_radius=POPUP_BORDER_RADIUS)
 
-    def draw(self, screen, game):
-        if game.state == GameState.START:
-            self.draw_start(screen)
-        elif game.state == GameState.PLAY:
-            self.draw_play(screen, game)
-        elif game.state == GameState.GAME_OVER:
-            self.draw_game_over(screen, game)
+    y = popup.top + POPUP_PADDING
+    screen.blit(title_surface, title_surface.get_rect(centerx=popup.centerx, top=y))
+    y += title_surface.get_height() + POPUP_TITLE_GAP
 
-    # draw title screen and new game buttons
-    def draw_start(self, screen):
-        screen.fill(TABLE_COLOR)
+    for surface in line_surfaces:
+        screen.blit(surface, surface.get_rect(centerx=popup.centerx, top=y))
+        y += POPUP_LINE_SPACING
 
-        # draw game title
-        title = self.title_font.render("Escoba", True, CARD_COLOR_FILL)
-        screen.blit(
-            title,
-            title.get_rect(
-                centerx=screen.get_rect().centerx, 
-                centery=screen.get_rect().centery - 100 
-            )
+def draw(screen, resources, state):
+    # state is None (menu), Game (play), or GameResult (over)
+    screen.fill(OLIVE)
+
+    if state is None:
+        draw_popup(
+            screen,
+            resources,
+            "Escoba",
+            ["Press Space to start", "Press Esc to quit"]
         )
 
-        text = self.text_font.render("Press Enter to start", True, CARD_COLOR_FILL)
-        screen.blit(
-            text,
-            text.get_rect(
-                centerx=screen.get_rect().centerx,
-                centery=screen.get_rect().centery + 100
-            )
+    elif isinstance(state, Game):
+        draw_board(
+            screen,
+            resources,
+            state.table,
+            [state.player_states[p.id].hand for p in state.players],
+            len(state.deck)
         )
 
-    # draw the play screen
-    def draw_play(self, screen, game):
-            self.board_renderer.draw(
-                screen, 
-                game.table, 
-                [player.hand for player in game.players], 
-                len(game.deck))
-
-    # draw winner, scores and new game buttons 
-    def draw_game_over(self, screen, game):
-        screen.fill(TABLE_COLOR)
-
-        # lines to display on the end board
-        lines = ["Game Over", f"Winner: {game.winner()}"]
-        lines += [f"{player}: {score}" for player, score in game.scores.items()]
-        lines.append("Press R to play again")
-
-        y = screen.get_rect().centery - (len(lines) * 40) // 2
-
-        # stack the lines down the middle of the screen
-
-        for line in lines:
-            surface = self.text_font.render(line, False, CARD_COLOR_FILL)
-            screen.blit(
-                surface, 
-                surface.get_rect(
-                    centerx=screen.get_rect().centerx, 
-                    top=y
-                )
-            )
-            y += 40
+    elif isinstance(state, GameResult):
+        winner = next(p for p in state.players if p.id == state.winner_id)
+        scores = dict(state.scores)
+        lines = [f"Winner: {winner.name}"]
+        lines.extend(f"{p.name}: {scores[p.id]}" for p in state.players)
+        lines.extend(["Press Space to play again", "Press N to return to menu"])
+        draw_popup(screen, resources, "Game Over", lines)

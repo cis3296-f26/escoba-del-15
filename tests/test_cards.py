@@ -1,4 +1,4 @@
-from escoba.core.cards import Suit
+from escoba.core.card import Suit
 from escoba.core.deck import Deck
 
 

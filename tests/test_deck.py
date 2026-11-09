@@ -1,7 +1,7 @@
 import random
 import pytest
 
-from escoba.core.cards import Card
+from escoba.core.card import Card
 from escoba.core.deck import Deck
 
 
