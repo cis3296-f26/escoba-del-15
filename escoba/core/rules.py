@@ -19,6 +19,15 @@ def find_captures(played: Card, table: list[Card]) -> list[tuple[Card, ...]]:
 
     return captures
 
+def is_legal_capture(card: Card, capture, table: list[Card]) -> bool:
+    # an empty capture just means placing the card on the table
+    if not capture:
+        return True
+    return (
+        all(taken in table for taken in capture)
+        and card.value + sum(taken.value for taken in capture) == TARGET_SUM
+    )
+
 def deal_cards(game: Game) -> None:
     for _ in range(3):
         for player in game.players:
