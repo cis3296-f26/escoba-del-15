@@ -1,52 +1,38 @@
-from enum import Enum, auto
+# mutable match state
 
-WINNING_SCORE = 21
+from dataclasses import dataclass, field
 
-class GameState(Enum):
-    START = auto()
-    PLAY = auto()
-    GAME_OVER = auto()
+from escoba.core.card import Card
+from escoba.core.deck import Deck
+from escoba.core.player import Player
+
+@dataclass
+class PlayerState:
+    hand: list = field(default_factory=list)
+    captured: list = field(default_factory=list)
+    escobas: int = 0
+    score: int = 0
 
 class Game:
-    def __init__(self, players, deck, table, turn=0):
-        self.players = players
-        self.deck = deck
-        self.table = table
-        self.turn = turn
-        # whoever captured most recently takes the leftover table at round end
-        self.last_capturer = None
-        # running game total for every player
-        self.scores = {player: 0 for player in players}
-        self.state = GameState.START
+    def __init__(self, players: list[Player] | tuple[Player, ...]):
+        self.players = tuple(players)
+
+        if len(self.players) not in (2, 3, 4):
+            raise ValueError("A game requires 2, 3, or 4 players")
+
+        if len({player.id for player in self.players}) != len(self.players):
+            raise ValueError("Player IDs must be unique")
+
+        self.player_states = { 
+            player.id: PlayerState() for player in self.players 
+            }
+
+        self.turn = 0
+        self.last_capturer: int | None = None
+
+        self.deck = Deck().shuffle()
+        self.table: list[Card] = []
         
-    def next_turn(self):
-        self.turn = (self.turn + 1) % len(self.players)
-
-    def add_round_scores(self, round_scores):
-        # round_scores maps each player to the points they counted this round
-        for player, points in round_scores.items():
-            self.scores[player] += points
-
-    def winner(self):
-        # highest total at or above the threshold wins; None means start a new round
-        best = max(self.scores.values())
-        leaders = [player for player, score in self.scores.items() if score == best]
-
-        if best < WINNING_SCORE or len(leaders) > 1:
-            return None
-
-        return leaders[0]
-
-    def is_game_over(self):
-        return self.winner() is not None
-
-   
-    def get_current_player(self):
-        return self.players[self.turn]
-
-    def deal_cards(self):
-        # Each player receives 3 cards
-        for _ in range(3):
-            for player in self.players:
-                card = self.deck.draw()
-                player.add_card(card)
+    @property
+    def current_player_id(self):
+        return self.players[self.turn].id

@@ -1,9 +1,8 @@
-from escoba.core.cards import Card, Suit
+from escoba.core.card import Card, Suit
 from escoba.core.deck import Deck
 from escoba.core.game import Game
 from escoba.core.player import Player
 from escoba.core.rules import (
-    card_value,
     end_turn,
     find_captures,
     play_card,
@@ -11,38 +10,47 @@ from escoba.core.rules import (
     start_round,
 )
 
+def make_game(hand, table):
+    # two players, the first one is up and holds `hand`
+    you = Player(0, "You")
+    cpu = Player(1, "CPU", is_cpu=True)
+    game = Game([you, cpu])
+    game.table = list(table)
+    game.player_states[you.id].hand = list(hand)
+    game.player_states[cpu.id].hand = []
+    return game
 
-def make_player(captured, escobas=0):
-    player = Player("p")
-    player.captured = list(captured)
-    player.escobas = escobas
-    return player
-
+def make_scored_game(captured_lists, escobas_list=None):
+    players = [
+        Player(i, f"p{i}")
+        for i in range(len(captured_lists))
+    ]
+    game = Game(players)
+    for i, captured in enumerate(captured_lists):
+        game.player_states[i].captured = list(captured)
+        if escobas_list is not None:
+            game.player_states[i].escobas = escobas_list[i]
+    return game
 
 def test_number_cards_keep_their_value():
     for rank in range(1, 8):
-        assert card_value(Card(Suit.OROS, rank)) == rank
-
+        assert Card(Suit.OROS, rank).value == rank
 
 def test_face_card_values():
-    assert card_value(Card(Suit.COPAS, 10)) == 8
-    assert card_value(Card(Suit.COPAS, 11)) == 9
-    assert card_value(Card(Suit.COPAS, 12)) == 10
-
+    assert Card(Suit.COPAS, 10).value == 8
+    assert Card(Suit.COPAS, 11).value == 9
+    assert Card(Suit.COPAS, 12).value == 10
 
 def test_deck_values_cover_1_to_10():
-    assert sorted({card_value(card) for card in Deck().cards}) == list(range(1, 11))
-
+    assert sorted({card.value for card in Deck().cards}) == list(range(1, 11))
 
 def test_no_captures_on_empty_table():
     assert find_captures(Card(Suit.OROS, 5), []) == []
-
 
 def test_single_card_capture():
     played = Card(Suit.OROS, 5)
     rey = Card(Suit.COPAS, 12)
     assert find_captures(played, [rey, Card(Suit.BASTOS, 3)]) == [(rey,)]
-
 
 def test_multiple_captures_are_all_returned():
     played = Card(Suit.OROS, 7)
@@ -58,196 +66,184 @@ def test_multiple_captures_are_all_returned():
         [{sota}, {one, seven}, {three, five}], key=len
     )
 
-
 def test_capture_can_take_whole_table():
     played = Card(Suit.OROS, 1)
     table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 4), Card(Suit.BASTOS, 10)]
     assert find_captures(played, table) == [tuple(table)]
-
 
 def test_no_capture_when_nothing_adds_up():
     played = Card(Suit.OROS, 1)
     table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 3)]
     assert find_captures(played, table) == []
 
-
-def test_score_no_players():
-    assert score_round([]) == []
-
-
 def test_score_one_point_per_escoba():
-    players = [make_player([], escobas=3), make_player([], escobas=0)]
-    assert score_round(players) == [3, 0]
-
+    game = make_scored_game([[], []], escobas_list=[3, 0])
+    assert score_round(game) == [3, 0]
 
 def test_score_most_cards():
-    players = [
-        make_player([Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)]),
-        make_player([Card(Suit.BASTOS, 1)]),
-    ]
-    assert score_round(players) == [1, 0]
-
+    game = make_scored_game([
+        [Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)],
+        [Card(Suit.BASTOS, 1)],
+    ])
+    assert score_round(game) == [1, 0]
 
 def test_score_most_cards_tied():
-    players = [
-        make_player([Card(Suit.COPAS, 1)]),
-        make_player([Card(Suit.BASTOS, 1)]),
-    ]
-    assert score_round(players) == [0, 0]
-
+    game = make_scored_game([
+        [Card(Suit.COPAS, 1)],
+        [Card(Suit.BASTOS, 1)],
+    ])
+    assert score_round(game) == [0, 0]
 
 def test_score_most_oros():
     # same number of cards, but player 1 has more oros
-    players = [
-        make_player([Card(Suit.OROS, 1), Card(Suit.OROS, 2)]),
-        make_player([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
-    ]
-    assert score_round(players) == [1, 0]
-
+    game = make_scored_game([
+        [Card(Suit.OROS, 1), Card(Suit.OROS, 2)],
+        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)],
+    ])
+    assert score_round(game) == [1, 0]
 
 def test_score_most_oros_tied():
-    players = [
-        make_player([Card(Suit.OROS, 1), Card(Suit.COPAS, 2)]),
-        make_player([Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]),
-    ]
-    assert score_round(players) == [0, 0]
-
+    game = make_scored_game([
+        [Card(Suit.OROS, 1), Card(Suit.COPAS, 2)],
+        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)],
+    ])
+    assert score_round(game) == [0, 0]
 
 def test_score_siete_de_velo():
     # player 1 gets velo + most oros + most sevens, player 2 nothing
-    players = [
-        make_player([Card(Suit.OROS, 7)]),
-        make_player([Card(Suit.COPAS, 1)]),
-    ]
-    assert score_round(players) == [3, 0]
-
+    game = make_scored_game([
+        [Card(Suit.OROS, 7)],
+        [Card(Suit.COPAS, 1)],
+    ])
+    assert score_round(game) == [3, 0]
 
 def test_score_most_sevens():
-    players = [
-        make_player([Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)]),
-        make_player([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
-    ]
-    assert score_round(players) == [1, 0]
-
+    game = make_scored_game([
+        [Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)],
+        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)],
+    ])
+    assert score_round(game) == [1, 0]
 
 def test_score_most_sevens_tied():
-    players = [
-        make_player([Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)]),
-        make_player([Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]),
-    ]
-    assert score_round(players) == [0, 0]
-
-
-def make_state(hand, table):
-    # two players, the first one is up and holds `hand`
-    you, cpu = Player("You"), Player("CPU", is_cpu=True)
-    you.hand = list(hand)
-    return Game([you, cpu], Deck(), list(table))
-
+    game = make_scored_game([
+        [Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)],
+        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)],
+    ])
+    assert score_round(game) == [0, 0]
 
 def test_play_without_capture_puts_card_on_table():
     played = Card(Suit.OROS, 2)
-    state = make_state([played], [Card(Suit.COPAS, 3)])
-    you = state.players[0]
+    game = make_game([played], [Card(Suit.COPAS, 3)])
+    you = game.players[0]
 
-    play_card(state, played)
+    play_card(game, played)
 
-    assert played in state.table
-    assert you.hand == []
-    assert you.captured == []
-    assert state.turn == 1
-
+    assert played in game.table
+    assert game.player_states[you.id].hand == []
+    assert game.player_states[you.id].captured == []
+    assert game.turn == 1
 
 def test_play_with_capture_takes_cards():
     played = Card(Suit.OROS, 5)
     rey = Card(Suit.COPAS, 12)
     three = Card(Suit.BASTOS, 3)
-    state = make_state([played], [rey, three])
-    you = state.players[0]
+    game = make_game([played], [rey, three])
+    you = game.players[0]
 
-    play_card(state, played, [rey])
+    play_card(game, played, [rey])
 
-    assert state.table == [three]
-    assert set(you.captured) == {played, rey}
-    assert you.escobas == 0
-    assert state.last_capturer is you
-    assert state.turn == 1
-
+    assert game.table == [three]
+    assert set(game.player_states[you.id].captured) == {played, rey}
+    assert game.player_states[you.id].escobas == 0
+    assert game.last_capturer == you.id
+    assert game.turn == 1
 
 def test_clearing_table_is_escoba():
     played = Card(Suit.OROS, 1)
     table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 4), Card(Suit.BASTOS, 10)]
-    state = make_state([played], table)
+    game = make_game([played], table)
+    you = game.players[0]
 
-    play_card(state, played, table)
+    play_card(game, played, table)
 
-    assert state.table == []
-    assert state.players[0].escobas == 1
-
+    assert game.table == []
+    assert game.player_states[you.id].escobas == 1
 
 def test_end_turn_waits_while_cards_in_hand():
-    state = make_state([Card(Suit.OROS, 1)], [])
+    game = make_game([Card(Suit.OROS, 1)], [])
+    you = game.players[0]
+    cpu = game.players[1]
 
-    end_turn(state)
+    end_turn(game)
 
-    assert len(state.players[0].hand) == 1
-    assert len(state.players[1].hand) == 0
-    assert len(state.deck) == 40
-
+    assert len(game.player_states[you.id].hand) == 1
+    assert len(game.player_states[cpu.id].hand) == 0
+    assert len(game.deck) == 40
 
 def test_end_turn_redeals_when_hands_empty():
-    state = make_state([], [])
+    game = make_game([], [])
 
-    end_turn(state)
+    end_turn(game)
 
-    assert all(len(player.hand) == 3 for player in state.players)
-    assert len(state.deck) == 34
-
+    assert all(
+        len(game.player_states[player.id].hand) == 3
+        for player in game.players
+    )
+    assert len(game.deck) == 34
 
 def test_end_round_gives_table_to_last_capturer_and_scores():
     velo = Card(Suit.OROS, 7)
     leftover = Card(Suit.COPAS, 1)
-    state = make_state([], [leftover])
-    state.deck.cards = []
-    you, cpu = state.players
-    you.captured = [velo]
-    state.last_capturer = you
+    game = make_game([], [leftover])
+    game.deck.cards = []
+    you, cpu = game.players
+    game.player_states[you.id].captured = [velo]
+    game.last_capturer = you.id
 
-    end_turn(state)
+    end_turn(game)
 
-    assert state.table == []
-    assert set(you.captured) == {velo, leftover}
+    assert game.table == []
+    assert set(game.player_states[you.id].captured) == {velo, leftover}
     # most cards + most oros + most sevens + siete de velo
-    assert state.scores == {you: 4, cpu: 0}
-
+    assert game.player_states[you.id].score == 4
+    assert game.player_states[cpu.id].score == 0
 
 def test_start_round_resets_and_deals():
-    state = make_state([], [])
-    state.players[0].captured = [Card(Suit.OROS, 1)]
-    state.players[0].escobas = 2
+    game = make_game([], [])
+    you = game.players[0]
+    game.player_states[you.id].captured = [Card(Suit.OROS, 1)]
+    game.player_states[you.id].escobas = 2
 
-    start_round(state)
+    start_round(game)
 
-    assert len(state.table) == 4
-    assert all(len(player.hand) == 3 for player in state.players)
-    assert len(state.deck) == 30
-    assert state.players[0].captured == []
-    assert state.players[0].escobas == 0
-
+    assert len(game.table) == 4
+    assert all(
+        len(game.player_states[player.id].hand) == 3
+        for player in game.players
+    )
+    assert len(game.deck) == 30
+    assert game.player_states[you.id].captured == []
+    assert game.player_states[you.id].escobas == 0
 
 def test_full_round_keeps_all_40_cards():
-    state = make_state([], [])
-    start_round(state)
+    game = make_game([], [])
+    start_round(game)
 
     # everyone just plays their first card and takes the first capture they can
-    while any(player.hand for player in state.players):
-        player = state.get_current_player()
-        card = player.hand[0]
-        captures = find_captures(card, state.table)
-        play_card(state, card, captures[0] if captures else ())
-        end_turn(state)
+    while any(game.player_states[player.id].hand for player in game.players):
+        player_id = game.current_player_id
+        state = game.player_states[player_id]
+        card = state.hand[0]
+        captures = find_captures(card, game.table)
+        play_card(game, card, captures[0] if captures else ())
+        end_turn(game)
 
-    captured = sum(len(player.captured) for player in state.players)
-    assert len(state.deck) == 0
-    assert captured + len(state.table) == 40
-    assert sum(state.scores.values()) > 0
+    captured = sum(
+        len(game.player_states[player.id].captured)
+        for player in game.players
+    )
+    assert len(game.deck) == 0
+    assert captured + len(game.table) == 40
+    assert sum(
+        game.player_states[player.id].score for player in game.players
+    ) > 0
