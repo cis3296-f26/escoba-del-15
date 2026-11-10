@@ -42,6 +42,7 @@ def play_card(game: Game, card: Card, capture=()) -> None:
         for taken in capture:
             game.table.remove(taken)
         state.captured.extend((card, *capture))
+        state.capture_count += 1
         game.last_capturer = game.current_player_id
 
         if not game.table:

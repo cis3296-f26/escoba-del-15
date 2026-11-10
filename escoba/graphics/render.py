@@ -1,10 +1,6 @@
 import pygame
 
-from escoba.core.game import Game
-from escoba.core.result import GameResult
-
-from escoba.graphics.board import draw_board
-from escoba.graphics.colors import WHITE, NAVY, SILVER, OLIVE
+from escoba.graphics.colors import WHITE, NAVY, SILVER
 
 POPUP_PADDING = 32
 POPUP_LINE_SPACING = 40
@@ -42,32 +38,3 @@ def draw_popup(screen, resources, title, lines):
     for surface in line_surfaces:
         screen.blit(surface, surface.get_rect(centerx=popup.centerx, top=y))
         y += POPUP_LINE_SPACING
-
-def draw(screen, resources, state):
-    # state is None (menu), Game (play), or GameResult (over)
-    screen.fill(OLIVE)
-
-    if state is None:
-        draw_popup(
-            screen,
-            resources,
-            "Escoba",
-            ["Press Space to start", "Press Esc to quit"]
-        )
-
-    elif isinstance(state, Game):
-        draw_board(
-            screen,
-            resources,
-            state.table,
-            [state.player_states[p.id].hand for p in state.players],
-            len(state.deck)
-        )
-
-    elif isinstance(state, GameResult):
-        winner = next(p for p in state.players if p.id == state.winner_id)
-        scores = dict(state.scores)
-        lines = [f"Winner: {winner.name}"]
-        lines.extend(f"{p.name}: {scores[p.id]}" for p in state.players)
-        lines.extend(["Press Space to play again", "Press N to return to menu"])
-        draw_popup(screen, resources, "Game Over", lines)
