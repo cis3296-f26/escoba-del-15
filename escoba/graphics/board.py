@@ -1,62 +1,85 @@
+from itertools import zip_longest
+
+import pygame
+
 from escoba.graphics.cards import draw_card, CARD_WIDTH, CARD_HEIGHT
 
 CARD_SPACING = 8
+CAPTURE_STACK_SPACING = 4
+CAPTURE_STACK_LAYERS = 6  # the pile stops spreading after this many cards
 EDGE_PADDING = 28
 DECK_GAP = 24
 HAND_SLOTS = 3
 TABLE_SLOTS = 4
+SELECTION_COLOR = (255, 215, 92)
 
-def draw_card_row(screen, resources, cards, x, y, face_up, slots):
-    cards = list(cards)
-    if len(cards) < slots:
-        cards = cards + [None] * (slots - len(cards))
-    if not cards:
-        return
+# layout, shared by drawing, click hit-testing and move animations
 
-    total = len(cards) * CARD_WIDTH + (len(cards) - 1) * CARD_SPACING
-    start = x - total / 2
+def card_row(center_x, y, places, step=CARD_WIDTH + CARD_SPACING):
+    start = center_x - (CARD_WIDTH + (places - 1) * step) / 2
+    return [
+        pygame.Rect(int(start + i * step), int(y), CARD_WIDTH, CARD_HEIGHT)
+        for i in range(places)
+    ]
 
-    for i, card in enumerate(cards):
-        pos = (int(start + i * (CARD_WIDTH + CARD_SPACING)), int(y))
-        draw_card(screen, resources, card, pos, face_up)
+def player_area(bounds, index, player_count):
+    # player 0 gets the bottom edge; opponents split the top edge evenly
+    if index == 0:
+        return pygame.Rect(bounds.left, bounds.bottom - CARD_HEIGHT - EDGE_PADDING, bounds.width, CARD_HEIGHT)
+    width = bounds.width // (player_count - 1)
+    return pygame.Rect(bounds.left + (index - 1) * width, bounds.top + EDGE_PADDING, width, CARD_HEIGHT)
 
-def draw_board(screen, resources, table_cards, player_hands, deck_count):
-    width, height = screen.get_size()
-    center_x, center_y = width // 2, height // 2
+def hand_rects(bounds, index, player_count, count):
+    area = player_area(bounds, index, player_count)
+    return card_row(area.centerx, area.y, max(count, HAND_SLOTS))
 
-    table_y = center_y - CARD_HEIGHT // 2
-    table_width = TABLE_SLOTS * CARD_WIDTH + (TABLE_SLOTS - 1) * CARD_SPACING
-    show_deck = deck_count > 0
-    group_width = table_width + (DECK_GAP + CARD_WIDTH if show_deck else 0)
-    group_left = center_x - group_width / 2
+def capture_stack_position(bounds, index, player_count, stack_index):
+    # face-down pile at the right end of each player's area; it grows leftward up to
+    # CAPTURE_STACK_LAYERS cards, then new cards land on top so it never reaches the hand
+    area = player_area(bounds, index, player_count)
+    layer = min(stack_index, CAPTURE_STACK_LAYERS - 1)
+    return area.right - EDGE_PADDING - CARD_WIDTH - layer * CAPTURE_STACK_SPACING, area.y
 
-    draw_card_row(
-        screen, resources, table_cards,
-        group_left + table_width / 2, table_y,
-        face_up=True, slots=TABLE_SLOTS
-    )
+def table_rects(bounds, count, deck_count):
+    # the table row and the deck are centered together as one group;
+    # a long table squeezes its cards together so the group stays on screen
+    places = max(count, TABLE_SLOTS)
+    deck_width = DECK_GAP + CARD_WIDTH if deck_count else 0
+    room = bounds.width - 2 * EDGE_PADDING - deck_width
+    step = min(CARD_WIDTH + CARD_SPACING, (room - CARD_WIDTH) // (places - 1))
+    return card_row(bounds.centerx - deck_width / 2, bounds.centery - CARD_HEIGHT // 2, places, step=step)
 
-    if show_deck:
-        screen.blit(
-            resources.card_back,
-            (int(group_left + table_width + DECK_GAP), table_y)
-        )
+def move_button(bounds):
+    button = pygame.Rect(0, 0, 112, 34)
+    button.center = (bounds.centerx, bounds.bottom - CARD_HEIGHT - EDGE_PADDING - 36)
+    return button
 
-    draw_card_row(
-        screen, resources, player_hands[0], center_x,
-        height - CARD_HEIGHT - EDGE_PADDING,
-        face_up=False, slots=HAND_SLOTS
-    )
+# drawing
 
-    opponents = player_hands[1:]
-    n = len(opponents)
-    if n == 0:
-        return
+def draw_card_row(screen, resources, cards, rects, face_up, selected, hidden):
+    # places past the last card, and cards mid-animation, draw as empty slots
+    for card, rect in zip_longest(cards, rects):
+        if card in hidden:
+            card = None
+        draw_card(screen, resources, card, rect.topleft, face_up)
+        if card is not None and card in selected:
+            pygame.draw.rect(screen, SELECTION_COLOR, rect, width=3)
 
-    segment = width / n
-    for i, hand in enumerate(opponents):
-        draw_card_row(
-            screen, resources, hand, 
-            (i + 0.5) * segment, EDGE_PADDING, 
-            face_up=False, slots=HAND_SLOTS
-        )
+def draw_board(screen, resources, game, selected, hidden):
+    bounds = screen.get_rect()
+    player_count = len(game.players)
+    deck_count = len(game.deck)
+
+    table = table_rects(bounds, len(game.table), deck_count)
+    draw_card_row(screen, resources, game.table, table, True, selected, hidden)
+
+    if deck_count:
+        screen.blit(resources.card_back, (table[-1].right + DECK_GAP, table[-1].y))
+
+    for i, player in enumerate(game.players):
+        state = game.player_states[player.id]
+        rects = hand_rects(bounds, i, player_count, len(state.hand))
+        # only the human player's own hand is face up
+        draw_card_row(screen, resources, state.hand, rects, i == 0, selected, hidden)
+        for stack_index in range(min(state.capture_count, CAPTURE_STACK_LAYERS)):
+            screen.blit(resources.card_back, capture_stack_position(bounds, i, player_count, stack_index))
