@@ -12,6 +12,7 @@ class PlayerState:
     captured: list = field(default_factory=list)
     escobas: int = 0
     score: int = 0
+    capture_count: int = 0
 
 class Game:
     def __init__(self, players: list[Player] | tuple[Player, ...]):
