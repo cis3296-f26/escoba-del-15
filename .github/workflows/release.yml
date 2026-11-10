@@ -20,7 +20,17 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: pytest
-      - run: pyinstaller --onefile --windowed --name escoba-${{ runner.os }} --paths . main.py
+
+      # windows/linux: one standalone file
+      - if: runner.os != 'macOS'
+        run: pyinstaller --onefile --windowed --noconfirm --name escoba-${{ runner.os }} --paths . --add-data "escoba/assets:escoba/assets" escoba/__main__.py
+
+      # mac: a zipped .app
+      - if: runner.os == 'macOS'
+        run: |
+          pyinstaller --windowed --noconfirm --name escoba --paths . --add-data "escoba/assets:escoba/assets" escoba/__main__.py
+          ditto -c -k --keepParent dist/escoba.app dist/escoba-macOS.zip
+
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/escoba-*

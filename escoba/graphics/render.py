@@ -12,6 +12,8 @@ POPUP_TITLE_GAP = 24
 POPUP_MIN_WIDTH = 460
 POPUP_BORDER_RADIUS = 16
 
+HINT_Y = 440
+
 def create_window(width, height, title):
     pygame.init()
     screen = pygame.display.set_mode((width, height), pygame.SCALED)
@@ -43,8 +45,9 @@ def draw_popup(screen, resources, title, lines):
         screen.blit(surface, surface.get_rect(centerx=popup.centerx, top=y))
         y += POPUP_LINE_SPACING
 
-def draw(screen, resources, state):
+def draw(screen, resources, state, selected=()):
     # state is None (menu), Game (play), or GameResult (over)
+    # during play, returns the clickable card rects from draw_board
     screen.fill(OLIVE)
 
     if state is None:
@@ -56,13 +59,27 @@ def draw(screen, resources, state):
         )
 
     elif isinstance(state, Game):
-        draw_board(
+        clickable = draw_board(
             screen,
             resources,
             state.table,
             [state.player_states[p.id].hand for p in state.players],
-            len(state.deck)
+            len(state.deck),
+            selected
         )
+
+        # one line of instructions above our hand
+        if state.players[state.turn].is_cpu:
+            hint = "CPU is thinking..."
+        else:
+            hint = "Pick a card, then table cards that make 15 (Space: put it down)"
+        hint_surface = resources.text_font.render(hint, True, WHITE)
+        screen.blit(
+            hint_surface,
+            hint_surface.get_rect(centerx=screen.get_rect().centerx, centery=HINT_Y)
+        )
+
+        return clickable
 
     elif isinstance(state, GameResult):
         winner = next(p for p in state.players if p.id == state.winner_id)

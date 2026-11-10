@@ -3,7 +3,7 @@ import pygame
 from escoba.core.player import Player
 from escoba.core.game import Game
 from escoba.core.result import GameResult
-from escoba.core.rules import end_turn, find_captures, play_card, start_round
+from escoba.core.rules import end_turn, is_legal_capture, play_card, start_round
 from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
 from escoba.graphics.resources import Resources
@@ -35,6 +35,21 @@ def take_turn(game, card, capture):
 
     return game
 
+def update_selection(pos, clickable, card, capture):
+    # clicking a hand card picks it (click again to unpick)
+    for hand_card, rect in clickable["hand"]:
+        if rect.collidepoint(pos):
+            return (None if hand_card == card else hand_card), []
+
+    # clicking table cards toggles them in the capture
+    for table_card, rect in clickable["table"]:
+        if rect.collidepoint(pos):
+            if table_card in capture:
+                return card, [c for c in capture if c != table_card]
+            return card, capture + [table_card]
+
+    return card, capture
+
 def main():
     screen = render.create_window(
         SCREEN_WIDTH, SCREEN_HEIGHT, "Escoba del 15"
@@ -47,6 +62,11 @@ def main():
     state = None
     cpu_ready_at = None
 
+    # what the player has clicked so far, and where the cards were last drawn
+    selected_card = None
+    selected_table = []
+    clickable = None
+
     running = True
 
     while running:
@@ -54,6 +74,23 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            elif (
+                event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+                and isinstance(state, Game) and clickable
+                and not state.players[state.turn].is_cpu
+            ):
+                selected_card, selected_table = update_selection(
+                    event.pos, clickable, selected_card, selected_table
+                )
+
+                # plays as soon as the picked cards add up to 15
+                if (
+                    selected_card is not None and selected_table
+                    and is_legal_capture(selected_card, selected_table, state.table)
+                ):
+                    state = take_turn(state, selected_card, selected_table)
+                    selected_card, selected_table = None, []
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -64,15 +101,13 @@ def main():
                         state = new_game(players)
 
                 elif isinstance(state, Game):
-                    # todo: temp keys 1-3, replaced by card click input
-                    player = state.players[state.turn]
-                    hand = state.player_states[player.id].hand
-                    index = event.key - pygame.K_1
-
-                    if not player.is_cpu and 0 <= index < len(hand):
-                        card = hand[index]
-                        captures = find_captures(card, state.table)
-                        state = take_turn(state, card, captures[0] if captures else ())
+                    # space puts the picked card down without capturing
+                    if (
+                        event.key == pygame.K_SPACE and selected_card is not None
+                        and not state.players[state.turn].is_cpu
+                    ):
+                        state = take_turn(state, selected_card, ())
+                        selected_card, selected_table = None, []
 
                 elif isinstance(state, GameResult):
                     if event.key == pygame.K_SPACE:
@@ -90,7 +125,8 @@ def main():
                 cpu_ready_at = None
                 state = take_turn(state, *choose_cpu_move(state))
 
-        render.draw(screen, resources, state)
+        selected = [selected_card, *selected_table] if selected_card else selected_table
+        clickable = render.draw(screen, resources, state, selected)
 
         # swap buffers
         pygame.display.flip()
