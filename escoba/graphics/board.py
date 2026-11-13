@@ -1,7 +1,7 @@
 import pygame
 
 from escoba.graphics.cards import draw_card, CARD_WIDTH, CARD_HEIGHT
-from escoba.graphics.colors import YELLOW
+from escoba.graphics.colors import YELLOW, BLACK, WHITE, GRAY, SILVER
 
 CARD_SPACING = 8
 EDGE_PADDING = 28
@@ -10,6 +10,9 @@ HAND_SLOTS = 3
 TABLE_SLOTS = 4
 SELECT_LIFT = 12
 SELECT_BORDER = 3
+BUTTON_WIDTH = 110
+BUTTON_HEIGHT = 28
+BUTTON_GAP = 10
 
 def draw_card_row(screen, resources, cards, x, y, face_up, slots, selected=()):
     cards = list(cards)
@@ -47,6 +50,22 @@ def table_layout(screen, deck_count):
     group_width = table_width + (DECK_GAP + CARD_WIDTH if deck_count > 0 else 0)
     group_left = width // 2 - group_width / 2
     return group_left + table_width / 2, height // 2 - CARD_HEIGHT // 2, group_left, table_width
+
+def button_rect(screen):
+    # small button centered just above your hand (and above a lifted card)
+    width, height = screen.get_size()
+    rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
+    rect.centerx = width // 2
+    rect.bottom = height - CARD_HEIGHT - EDGE_PADDING - SELECT_LIFT - BUTTON_GAP
+    return rect
+
+def draw_button(screen, resources, label, enabled):
+    rect = button_rect(screen)
+    fill, ink = (WHITE, BLACK) if enabled else (SILVER, GRAY)
+    pygame.draw.rect(screen, fill, rect, border_radius=6)
+    pygame.draw.rect(screen, ink, rect, width=2, border_radius=6)
+    text = resources.button_font.render(label, True, ink)
+    screen.blit(text, text.get_rect(center=rect.center))
 
 def hand_card_at(screen, pos):
     width, height = screen.get_size()

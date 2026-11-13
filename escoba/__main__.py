@@ -3,10 +3,10 @@ import pygame
 from escoba.core.player import Player
 from escoba.core.game import Game
 from escoba.core.result import GameResult
-from escoba.core.rules import end_turn, find_captures, play_card, start_round
+from escoba.core.rules import end_turn, is_legal_capture, play_card, start_round
 from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
-from escoba.graphics.board import hand_card_at, table_card_at
+from escoba.graphics.board import button_rect, hand_card_at, table_card_at
 from escoba.graphics.resources import Resources
 
 SCREEN_WIDTH = 960
@@ -36,6 +36,20 @@ def take_turn(game, card, capture):
 
     return game
 
+def button_state(game, selected, table_selected):
+    # (label, capture or None when disabled) for the discard/capture button
+    if game.players[game.turn].is_cpu or selected is None:
+        return "Discard", None
+
+    card = game.player_states[game.current_player_id].hand[selected]
+    capture = tuple(game.table[i] for i in sorted(table_selected))
+
+    if not capture:
+        return "Discard", ()
+    if is_legal_capture(card, capture, game.table):
+        return "Capture", capture
+    return "Capture", None
+
 def main():
     screen = render.create_window(
         SCREEN_WIDTH, SCREEN_HEIGHT, "Escoba del 15"
@@ -59,25 +73,29 @@ def main():
                 running = False
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                # click a card to select it, click it again to play it
+                # select cards by clicking; only the button makes a move
                 if isinstance(state, Game) and not state.players[state.turn].is_cpu:
                     hand = state.player_states[state.current_player_id].hand
                     index = hand_card_at(screen, event.pos)
                     table_index = table_card_at(screen, event.pos, len(state.table), len(state.deck))
 
-                    # click a table card to toggle its highlight
-                    if table_index is not None and table_index < len(state.table):
-                        table_selected ^= {table_index}
+                    label, capture = button_state(state, selected, table_selected)
 
-                    elif index is not None and index < len(hand):
-                        if index == selected:
-                            card = hand[index]
+                    # the button plays the selected card as a discard or capture
+                    if button_rect(screen).collidepoint(event.pos):
+                        if capture is not None:
+                            card = hand[selected]
                             selected = None
                             table_selected = set()
-                            captures = find_captures(card, state.table)
-                            state = take_turn(state, card, captures[0] if captures else ())
-                        else:
-                            selected = index
+                            state = take_turn(state, card, capture)
+
+                    # click a table card to toggle its highlight
+                    elif table_index is not None and table_index < len(state.table):
+                        table_selected ^= {table_index}
+
+                    # click a hand card to select it, click it again to deselect
+                    elif index is not None and index < len(hand):
+                        selected = None if index == selected else index
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -88,7 +106,7 @@ def main():
                         state = new_game(players)
 
                 elif isinstance(state, Game):
-                    # todo: temp keys 1-3 select, enter plays; replaced by card click input
+                    # keys 1-3 select a hand card too; only the button plays it
                     player = state.players[state.turn]
                     hand = state.player_states[player.id].hand
                     index = event.key - pygame.K_1
@@ -98,13 +116,6 @@ def main():
 
                     elif 0 <= index < len(hand):
                         selected = index
-
-                    elif event.key == pygame.K_RETURN and selected is not None:
-                        card = hand[selected]
-                        selected = None
-                        table_selected = set()
-                        captures = find_captures(card, state.table)
-                        state = take_turn(state, card, captures[0] if captures else ())
 
                 elif isinstance(state, GameResult):
                     if event.key == pygame.K_SPACE:
@@ -123,7 +134,12 @@ def main():
                 table_selected = set()
                 state = take_turn(state, *choose_cpu_move(state))
 
-        render.draw(screen, resources, state, selected, table_selected)
+        button = None
+        if isinstance(state, Game):
+            label, capture = button_state(state, selected, table_selected)
+            button = (label, capture is not None)
+
+        render.draw(screen, resources, state, selected, table_selected, button)
 
         # swap buffers
         pygame.display.flip()
