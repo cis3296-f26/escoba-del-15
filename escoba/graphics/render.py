@@ -3,7 +3,7 @@ import pygame
 from escoba.core.game import Game
 from escoba.core.result import GameResult
 
-from escoba.graphics.board import draw_board
+from escoba.graphics.board import draw_board, draw_button
 from escoba.graphics.colors import WHITE, NAVY, SILVER, OLIVE
 
 POPUP_PADDING = 32
@@ -43,7 +43,7 @@ def draw_popup(screen, resources, title, lines):
         screen.blit(surface, surface.get_rect(centerx=popup.centerx, top=y))
         y += POPUP_LINE_SPACING
 
-def draw(screen, resources, state):
+def draw(screen, resources, state, selected=None, table_selected=(), button=None):
     # state is None (menu), Game (play), or GameResult (over)
     screen.fill(OLIVE)
 
@@ -61,8 +61,13 @@ def draw(screen, resources, state):
             resources,
             state.table,
             [state.player_states[p.id].hand for p in state.players],
-            len(state.deck)
+            len(state.deck),
+            () if selected is None else (selected,),
+            table_selected
         )
+
+        if button is not None:
+            draw_button(screen, resources, *button)
 
     elif isinstance(state, GameResult):
         winner = next(p for p in state.players if p.id == state.winner_id)

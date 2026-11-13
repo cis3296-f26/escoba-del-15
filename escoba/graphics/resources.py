@@ -10,6 +10,7 @@ class Resources:
     def __init__(self):
         self.text_font = pygame.font.Font(None, 32)
         self.title_font = pygame.font.Font(None, 64)
+        self.button_font = pygame.font.Font(None, 24)
         
         self.card_faces = {
             card: pygame.image.load(CARD_ASSET_DIR / f"{card.suit.value}_{card.rank}.png").convert_alpha()
