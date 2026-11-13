@@ -45,7 +45,7 @@ def draw_board(screen, resources, table_cards, player_hands, deck_count):
     draw_card_row(
         screen, resources, player_hands[0], center_x,
         height - CARD_HEIGHT - EDGE_PADDING,
-        face_up=False, slots=HAND_SLOTS
+        face_up=True, slots=HAND_SLOTS
     )
 
     opponents = player_hands[1:]
