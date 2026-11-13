@@ -77,7 +77,7 @@ def main():
                 if isinstance(state, Game) and not state.players[state.turn].is_cpu:
                     hand = state.player_states[state.current_player_id].hand
                     index = hand_card_at(screen, event.pos)
-                    table_index = table_card_at(screen, event.pos, len(state.table), len(state.deck))
+                    table_index = table_card_at(screen, event.pos, len(state.table))
 
                     label, capture = button_state(state, selected, table_selected)
 
