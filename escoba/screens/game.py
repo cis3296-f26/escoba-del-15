@@ -6,6 +6,7 @@ from escoba.core.result import GameResult
 from escoba.core.rules import end_turn, is_legal_capture, play_card, start_round
 from escoba.graphics import render
 from escoba.graphics.board import button_rect, hand_card_at, table_card_at
+from escoba.screens.round_over import RoundOverScreen
 from escoba.screens.screen import Screen
 
 # how long the cpu "thinks" before playing
@@ -25,12 +26,6 @@ def take_turn(game, card, capture):
     result = end_turn(game)
     if result is not None:
         return result
-
-    # hands empty here means the round just ended without a winner
-    # todo: round summary screen goes here before the next round
-    if not any(state.hand for state in game.player_states.values()):
-        start_round(game)
-
     return game
 
 def button_state(game, selected, table_selected):
@@ -75,6 +70,8 @@ class GameScreen(Screen):
             # imported here because the result screen imports this module
             from escoba.screens.result import ResultScreen
             self.app.change_screen(ResultScreen(self.app, state))
+        elif not any(s.hand for s in self.game.player_states.values()):
+            self.app.change_screen(RoundOverScreen(self.app, self))
         else:
             self.schedule_cpu()
 
