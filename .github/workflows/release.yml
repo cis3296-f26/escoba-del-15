@@ -20,7 +20,7 @@ jobs:
           python-version: "3.12"
       - run: pip install -r requirements.txt
       - run: pytest
-      - run: pyinstaller --onefile --windowed --name escoba-${{ runner.os }} --paths . main.py
+      - run: pyinstaller --onefile --windowed --name escoba-${{ runner.os }} --add-data "escoba/assets:escoba/assets" main.py
       - uses: softprops/action-gh-release@v3
         with:
           files: dist/escoba-*

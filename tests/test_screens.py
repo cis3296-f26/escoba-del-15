@@ -3,7 +3,7 @@ import random
 import pygame
 import pytest
 
-from escoba.__main__ import App
+from main import App
 from escoba.core.card import Card, Suit, SIETE_DE_VELO
 from escoba.core.player import Player
 from escoba.core.result import GameResult

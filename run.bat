@@ -5,4 +5,4 @@ if not exist ".venv\Scripts\python.exe" (
     exit 
 )
 
-.venv\Scripts\python -m escoba
+.venv\Scripts\python main.py

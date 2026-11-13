@@ -6,4 +6,4 @@ if [ ! -x ".venv/bin/python" ]; then
     exit 1
 fi
 
-exec .venv/bin/python -m escoba "$@"
+exec .venv/bin/python main.py
