@@ -112,6 +112,46 @@ def score_round(game: Game) -> list[int]:
 
     return points
 
+
+def score_round_breakdown(game: Game):
+    states = [game.player_states[p.id] for p in game.players]
+
+    breakdown = []
+
+    for state in states:
+        breakdown.append({
+            "most_cards": 0,
+            "most_oros": 0,
+            "most_sevens": 0,
+            "velo": int(SIETE_DE_VELO in state.captured),
+            "escobas": state.escobas
+        })
+
+    categories = {
+        "most_cards": [len(s.captured) for s in states],
+        "most_oros": [
+            sum(c.suit == Suit.OROS for c in s.captured)
+            for s in states
+        ],
+        "most_sevens": [
+            sum(c.rank == 7 for c in s.captured)
+            for s in states
+        ]
+    }
+
+    for category, counts in categories.items():
+        points = [0] * len(states)
+        award_most(points, counts)
+
+        for entry, earned in zip(breakdown, points):
+            entry[category] = earned
+
+    for entry in breakdown:
+        entry["round_total"] = sum(entry.values())
+
+    return breakdown
+
+
 def finish_game(game: Game) -> GameResult | None:
     scores = tuple(
         (player.id, game.player_states[player.id].score) for player in game.players
@@ -127,3 +167,5 @@ def finish_game(game: Game) -> GameResult | None:
         winner_id=leaders[0],
         scores=scores,
     )
+
+    

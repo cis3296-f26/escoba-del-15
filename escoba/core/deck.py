@@ -8,7 +8,7 @@ class Deck:
     def __init__(self):
         self.cards = list(ALL_CARDS)
 
-    def shuffle(self, rng=random) -> Deck:
+    def shuffle(self, rng=random) -> "Deck":
         rng.shuffle(self.cards)
         return self
 

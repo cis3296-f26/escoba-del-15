@@ -6,6 +6,7 @@ from escoba.core.result import GameResult
 from escoba.core.rules import end_turn, find_captures, play_card, start_round
 from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
+from escoba.graphics.roundover import draw_round_over
 from escoba.graphics.resources import Resources
 
 SCREEN_WIDTH = 960
@@ -27,13 +28,10 @@ def take_turn(game, card, capture):
     result = end_turn(game)
     if result is not None:
         return result
-
-    # hands empty here means the round just ended without a winner
-    # todo: round summary screen goes here before the next round
-    if not any(state.hand for state in game.player_states.values()):
-        start_round(game)
-
     return game
+
+def round_finished(state):
+    return ( isinstance(state, Game) and not any(s.hand for s in state.player_states.values()))
 
 def main():
     screen = render.create_window(
@@ -46,7 +44,7 @@ def main():
     players = (Player(0, "You"), Player(1, "CPU", is_cpu=True))
     state = None
     cpu_ready_at = None
-
+    round_over = False
     running = True
 
     while running:
@@ -58,6 +56,11 @@ def main():
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     running = False
+                elif round_over:
+                    if event.key == pygame.K_RETURN:
+                        round_over = False
+                        cpu_ready_at = None
+                        start_round(state)
 
                 elif state is None:
                     if event.key == pygame.K_SPACE:
@@ -73,7 +76,7 @@ def main():
                         card = hand[index]
                         captures = find_captures(card, state.table)
                         state = take_turn(state, card, captures[0] if captures else ())
-
+                        round_over = round_finished(state)
                 elif isinstance(state, GameResult):
                     if event.key == pygame.K_SPACE:
                         state = new_game(state.players)
@@ -82,15 +85,19 @@ def main():
                         state = None
 
         # 2. let the cpu play after a short pause
-        if isinstance(state, Game) and state.players[state.turn].is_cpu:
+        if not round_over and isinstance(state, Game) and state.players[state.turn].is_cpu:
             now = pygame.time.get_ticks()
             if cpu_ready_at is None:
                 cpu_ready_at = now + CPU_DELAY_MS
             elif now >= cpu_ready_at:
                 cpu_ready_at = None
                 state = take_turn(state, *choose_cpu_move(state))
+                round_over = round_finished(state)
 
-        render.draw(screen, resources, state)
+        if round_over:
+            draw_round_over(screen, state)
+        else:
+            render.draw(screen, resources, state)
 
         # swap buffers
         pygame.display.flip()
