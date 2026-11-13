@@ -6,6 +6,7 @@ from escoba.core.result import GameResult
 from escoba.core.rules import end_turn, find_captures, play_card, start_round
 from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
+from escoba.graphics.board import hand_card_at
 from escoba.graphics.resources import Resources
 
 SCREEN_WIDTH = 960
@@ -46,6 +47,7 @@ def main():
     players = (Player(0, "You"), Player(1, "CPU", is_cpu=True))
     state = None
     cpu_ready_at = None
+    selected = None  # index of the selected card in your hand
 
     running = True
 
@@ -54,6 +56,21 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
+
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                # click a card to select it, click it again to play it
+                if isinstance(state, Game) and not state.players[state.turn].is_cpu:
+                    hand = state.player_states[state.current_player_id].hand
+                    index = hand_card_at(screen, event.pos)
+
+                    if index is not None and index < len(hand):
+                        if index == selected:
+                            card = hand[index]
+                            selected = None
+                            captures = find_captures(card, state.table)
+                            state = take_turn(state, card, captures[0] if captures else ())
+                        else:
+                            selected = index
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
@@ -64,13 +81,20 @@ def main():
                         state = new_game(players)
 
                 elif isinstance(state, Game):
-                    # todo: temp keys 1-3, replaced by card click input
+                    # todo: temp keys 1-3 select, enter plays; replaced by card click input
                     player = state.players[state.turn]
                     hand = state.player_states[player.id].hand
                     index = event.key - pygame.K_1
 
-                    if not player.is_cpu and 0 <= index < len(hand):
-                        card = hand[index]
+                    if player.is_cpu:
+                        pass
+
+                    elif 0 <= index < len(hand):
+                        selected = index
+
+                    elif event.key == pygame.K_RETURN and selected is not None:
+                        card = hand[selected]
+                        selected = None
                         captures = find_captures(card, state.table)
                         state = take_turn(state, card, captures[0] if captures else ())
 
@@ -90,7 +114,7 @@ def main():
                 cpu_ready_at = None
                 state = take_turn(state, *choose_cpu_move(state))
 
-        render.draw(screen, resources, state)
+        render.draw(screen, resources, state, selected)
 
         # swap buffers
         pygame.display.flip()

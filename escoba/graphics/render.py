@@ -43,7 +43,7 @@ def draw_popup(screen, resources, title, lines):
         screen.blit(surface, surface.get_rect(centerx=popup.centerx, top=y))
         y += POPUP_LINE_SPACING
 
-def draw(screen, resources, state):
+def draw(screen, resources, state, selected=None):
     # state is None (menu), Game (play), or GameResult (over)
     screen.fill(OLIVE)
 
@@ -61,7 +61,8 @@ def draw(screen, resources, state):
             resources,
             state.table,
             [state.player_states[p.id].hand for p in state.players],
-            len(state.deck)
+            len(state.deck),
+            selected
         )
 
     elif isinstance(state, GameResult):
