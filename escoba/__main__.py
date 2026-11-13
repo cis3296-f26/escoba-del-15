@@ -1,22 +1,17 @@
 import pygame
 
 from escoba.core.player import Player
-from escoba.core.game import Game
-from escoba.core.result import GameResult
-from escoba.core.rules import end_turn, is_legal_capture, play_card, start_round
-from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
 from escoba.graphics.roundover import draw_round_over
 from escoba.graphics.board import button_rect, hand_card_at, table_card_at
 from escoba.graphics.resources import Resources
+from escoba.screens import MenuScreen, Screen
 
 SCREEN_WIDTH = 960
 SCREEN_HEIGHT = 640
 
 FPS = 30
 
-# how long the cpu "thinks" before playing
-CPU_DELAY_MS = 800
 
 def new_game(players):
     game = Game(players)
@@ -121,16 +116,42 @@ def main():
                         round_over = round_finished(state)
                     if player.is_cpu:
                         pass
+class App:
+    # owns the window and the active screen; screens call change_screen to move on
+    def __init__(self):
+        self.surface = render.create_window(
+            SCREEN_WIDTH, SCREEN_HEIGHT, "Escoba del 15"
+        )
+        self.resources = Resources()
+        players = (Player(0, "You"), Player(1, "CPU", is_cpu=True))
+        self.screen: Screen = MenuScreen(self, players)
 
-                    elif 0 <= index < len(hand):
-                        selected = index
+    def change_screen(self, screen: Screen):
+        self.screen = screen
 
-                elif isinstance(state, GameResult):
-                    if event.key == pygame.K_SPACE:
-                        state = new_game(state.players)
+    def run(self):
+        clock = pygame.time.Clock()
+        running = True
 
-                    elif event.key == pygame.K_n:
-                        state = None
+        while running:
+            # 1. handle input; quit and Esc work on every screen
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT or (
+                    event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
+                ):
+                    running = False
+                else:
+                    self.screen.handle_event(event)
+
+            # 2. draw and swap buffers
+            self.screen.draw(self.surface)
+            pygame.display.flip()
+
+            # 3. wait so the loop runs at a steady frame rate
+            clock.tick(FPS)
+
+        pygame.quit()
+
 
         # 2. let the cpu play after a short pause
         if not round_over and isinstance(state, Game) and state.players[state.turn].is_cpu:
@@ -161,6 +182,8 @@ def main():
         clock.tick(FPS)
 
     pygame.quit()
+def main():
+    App().run()
 
 if __name__ == "__main__":
     main()
