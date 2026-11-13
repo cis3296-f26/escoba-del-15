@@ -6,7 +6,7 @@ from escoba.core.result import GameResult
 from escoba.core.rules import end_turn, find_captures, play_card, start_round
 from escoba.core.cpu import choose_cpu_move
 from escoba.graphics import render
-from escoba.graphics.board import hand_card_at
+from escoba.graphics.board import hand_card_at, table_card_at
 from escoba.graphics.resources import Resources
 
 SCREEN_WIDTH = 960
@@ -48,6 +48,7 @@ def main():
     state = None
     cpu_ready_at = None
     selected = None  # index of the selected card in your hand
+    table_selected = set()  # indices of highlighted table cards
 
     running = True
 
@@ -62,11 +63,17 @@ def main():
                 if isinstance(state, Game) and not state.players[state.turn].is_cpu:
                     hand = state.player_states[state.current_player_id].hand
                     index = hand_card_at(screen, event.pos)
+                    table_index = table_card_at(screen, event.pos, len(state.table), len(state.deck))
 
-                    if index is not None and index < len(hand):
+                    # click a table card to toggle its highlight
+                    if table_index is not None and table_index < len(state.table):
+                        table_selected ^= {table_index}
+
+                    elif index is not None and index < len(hand):
                         if index == selected:
                             card = hand[index]
                             selected = None
+                            table_selected = set()
                             captures = find_captures(card, state.table)
                             state = take_turn(state, card, captures[0] if captures else ())
                         else:
@@ -95,6 +102,7 @@ def main():
                     elif event.key == pygame.K_RETURN and selected is not None:
                         card = hand[selected]
                         selected = None
+                        table_selected = set()
                         captures = find_captures(card, state.table)
                         state = take_turn(state, card, captures[0] if captures else ())
 
@@ -112,9 +120,10 @@ def main():
                 cpu_ready_at = now + CPU_DELAY_MS
             elif now >= cpu_ready_at:
                 cpu_ready_at = None
+                table_selected = set()
                 state = take_turn(state, *choose_cpu_move(state))
 
-        render.draw(screen, resources, state, selected)
+        render.draw(screen, resources, state, selected, table_selected)
 
         # swap buffers
         pygame.display.flip()
