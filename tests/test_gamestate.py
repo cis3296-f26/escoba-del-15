@@ -25,28 +25,6 @@ def test_scores_start_at_zero():
     assert game.player_states[you.id].score == 0
     assert game.player_states[cpu.id].score == 0
 
-def test_add_round_scores_adds_points():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score += 3
-    game.player_states[cpu.id].score += 1
-    assert game.player_states[you.id].score == 3
-    assert game.player_states[cpu.id].score == 1
-
-def test_round_scores_accumulate():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score += 3
-    game.player_states[cpu.id].score += 1
-    game.player_states[you.id].score += 2
-    game.player_states[cpu.id].score += 4
-    assert game.player_states[you.id].score == 5
-    assert game.player_states[cpu.id].score == 5
-
-def test_add_round_scores_only_changes_listed_players():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score += 2
-    assert game.player_states[you.id].score == 2
-    assert game.player_states[cpu.id].score == 0
-
 def test_no_winner_below_21():
     game, you, cpu = make_two_player_game()
     game.player_states[you.id].score = 20
@@ -77,28 +55,10 @@ def test_highest_wins_when_both_over_21():
     assert result is not None
     assert result.winner_id == you.id
 
-def test_tie_over_21_has_no_winner():
+def test_tie_has_no_winner():
     game, you, cpu = make_two_player_game()
     game.player_states[you.id].score = 22
     game.player_states[cpu.id].score = 22
-    assert finish_game(game) is None
-
-def test_game_not_over_below_21():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score = 20
-    game.player_states[cpu.id].score = 18
-    assert finish_game(game) is None
-
-def test_game_over_when_someone_wins():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score = 21
-    game.player_states[cpu.id].score = 5
-    assert finish_game(game) is not None
-
-def test_game_not_over_on_tie():
-    game, you, cpu = make_two_player_game()
-    game.player_states[you.id].score = 21
-    game.player_states[cpu.id].score = 21
     assert finish_game(game) is None
 
 def test_current_player_follows_turn():

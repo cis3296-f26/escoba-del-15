@@ -3,7 +3,7 @@ from itertools import combinations
 from escoba.core.card import Card, Suit, SIETE_DE_VELO
 from escoba.core.deck import Deck
 from escoba.core.game import Game, PlayerState
-from escoba.core.result import GameResult
+from escoba.core.result import GameResult, RoundBreakdown, RoundResult
 
 WINNING_SCORE = 21
 TARGET_SUM = 15
@@ -63,7 +63,12 @@ def start_round(game: Game) -> None:
 
     deal_cards(game)
 
-def end_turn(game: Game) -> GameResult | None:
+def new_game(players) -> Game:
+    game = Game(players)
+    start_round(game)
+    return game
+
+def end_turn(game: Game) -> GameResult | RoundResult | None:
     if any(state.hand for state in game.player_states.values()):
         return None
 
@@ -73,16 +78,21 @@ def end_turn(game: Game) -> GameResult | None:
 
     return end_round(game)
 
-def end_round(game: Game) -> GameResult | None:
+def end_round(game: Game) -> GameResult | RoundResult:
     if game.last_capturer is not None:
         game.player_states[game.last_capturer].captured.extend(game.table)
         game.table = []
 
-    points = score_round(game)
-    for player, earned in zip(game.players, points):
-        game.player_states[player.id].score += earned
+    breakdown = score_round_breakdown(game)
+    for player, entry in zip(game.players, breakdown):
+        game.player_states[player.id].score += entry.round_total
 
-    return finish_game(game)
+    finished = finish_game(game)
+    if finished is not None:
+        return finished
+
+    totals = tuple(game.player_states[p.id].score for p in game.players)
+    return RoundResult(breakdown=breakdown, totals=totals)
 
 def award_most(points: list[int], counts: list[int]) -> None:
     best = max(counts, default=0)
@@ -90,67 +100,33 @@ def award_most(points: list[int], counts: list[int]) -> None:
         points[counts.index(best)] += 1
 
 def score_round(game: Game) -> list[int]:
-    states = [game.player_states[player.id] for player in game.players]
-    points = [state.escobas for state in states]
+    return [entry.round_total for entry in score_round_breakdown(game)]
 
-    card_counts = []
-    oros_counts = []
-    seven_counts = []
-
-    for state in states:
-        card_counts.append(len(state.captured))
-        oros_counts.append(sum(card.suit == Suit.OROS for card in state.captured))
-        seven_counts.append(sum(card.rank == 7 for card in state.captured))
-
-    award_most(points, card_counts)
-    award_most(points, oros_counts)
-    award_most(points, seven_counts)
-
-    for i, state in enumerate(states):
-        if SIETE_DE_VELO in state.captured:
-            points[i] += 1
-
-    return points
-
-
-def score_round_breakdown(game: Game):
+def score_round_breakdown(game: Game) -> tuple[RoundBreakdown, ...]:
     states = [game.player_states[p.id] for p in game.players]
+    n = len(states)
 
-    breakdown = []
+    most_cards = [0] * n
+    most_oros = [0] * n
+    most_sevens = [0] * n
+    award_most(most_cards, [len(s.captured) for s in states])
+    award_most(most_oros, [
+        sum(c.suit == Suit.OROS for c in s.captured) for s in states
+    ])
+    award_most(most_sevens, [
+        sum(c.rank == 7 for c in s.captured) for s in states
+    ])
 
-    for state in states:
-        breakdown.append({
-            "most_cards": 0,
-            "most_oros": 0,
-            "most_sevens": 0,
-            "velo": int(SIETE_DE_VELO in state.captured),
-            "escobas": state.escobas
-        })
-
-    categories = {
-        "most_cards": [len(s.captured) for s in states],
-        "most_oros": [
-            sum(c.suit == Suit.OROS for c in s.captured)
-            for s in states
-        ],
-        "most_sevens": [
-            sum(c.rank == 7 for c in s.captured)
-            for s in states
-        ]
-    }
-
-    for category, counts in categories.items():
-        points = [0] * len(states)
-        award_most(points, counts)
-
-        for entry, earned in zip(breakdown, points):
-            entry[category] = earned
-
-    for entry in breakdown:
-        entry["round_total"] = sum(entry.values())
-
-    return breakdown
-
+    return tuple(
+        RoundBreakdown(
+            most_cards=most_cards[i],
+            most_oros=most_oros[i],
+            most_sevens=most_sevens[i],
+            velo=int(SIETE_DE_VELO in state.captured),
+            escobas=state.escobas
+        )
+        for i, state in enumerate(states)
+    )
 
 def finish_game(game: Game) -> GameResult | None:
     scores = tuple(
@@ -165,7 +141,5 @@ def finish_game(game: Game) -> GameResult | None:
     return GameResult(
         players=game.players,
         winner_id=leaders[0],
-        scores=scores,
+        scores=scores
     )
-
-    

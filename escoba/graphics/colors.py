@@ -1,25 +1,33 @@
-TRANSPARENT = (0, 0, 0, 0)
+from enum import Enum
 
-BLACK = (17, 17, 17)
-GRAY = (170, 170, 170)
-SILVER = (221, 221, 221)
-WHITE = (255, 255, 255)
 
-NAVY = (0, 31, 63)
-BLUE = (0, 116, 217)
-AQUA = (127, 219, 255)
-TEAL = (57, 204, 204)
+class Color(Enum):
+    TRANSPARENT = (0, 0, 0, 0)
 
-OLIVE = (61, 153, 112)
-GREEN = (46, 204, 64)
-LIME = (1, 255, 112)
+    BLACK = (17, 17, 17)
+    GRAY = (170, 170, 170)
+    SILVER = (221, 221, 221)
+    WHITE = (255, 255, 255)
 
-YELLOW = (255, 220, 0)
-ORANGE = (255, 133, 27)
-RED = (255, 65, 54)
+    NAVY = (0, 31, 63)
+    BLUE = (0, 116, 217)
+    AQUA = (127, 219, 255)
+    TEAL = (57, 204, 204)
 
-MAROON = (133, 20, 75)
-PURPLE = (177, 13, 201)
-FUCHSIA = (240, 18, 190)
+    OLIVE = (61, 153, 112)
+    GREEN = (46, 204, 64)
+    LIME = (1, 255, 112)
 
-BROWN = (72, 31, 1)
+    YELLOW = (255, 220, 0)
+    ORANGE = (255, 133, 27)
+    RED = (255, 65, 54)
+
+    MAROON = (133, 20, 75)
+    PURPLE = (177, 13, 201)
+    FUCHSIA = (240, 18, 190)
+
+    BROWN = (72, 31, 1)
+
+    @staticmethod
+    def rgba(r: int, g: int, b: int, a: int | None = None):
+        return (r, g, b) if a is None else (r, g, b, a)
