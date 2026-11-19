@@ -5,15 +5,15 @@ from escoba.core.game import Game
 from escoba.core.rules import find_captures
 
 def move_priority(move, table: list[Card]):
-    # tuples compare left to right, so earlier entries matter most
+    # earlier tuple entries win: escoba > velo > sevens > oros > count
     card, capture = move
     taken = (card, *capture)
     return (
-        len(capture) == len(table),  # escoba
+        len(capture) == len(table),
         SIETE_DE_VELO in taken,
         sum(c.rank == 7 for c in taken),
         sum(c.suit == Suit.OROS for c in taken),
-        len(taken),
+        len(taken)
     )
 
 def choose_cpu_move(game: Game) -> tuple[Card, tuple[Card, ...]]:
@@ -24,7 +24,6 @@ def choose_cpu_move(game: Game) -> tuple[Card, tuple[Card, ...]]:
         for capture in find_captures(card, game.table)
     ]
 
-    # nothing to capture: get rid of the lowest card
     if not moves:
         return min(hand, key=lambda card: card.value), ()
 
