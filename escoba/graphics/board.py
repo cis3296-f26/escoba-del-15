@@ -1,117 +1,225 @@
 import pygame
 
-from escoba.graphics.cards import draw_card, CARD_WIDTH, CARD_HEIGHT
-from escoba.graphics.colors import YELLOW, BLACK, WHITE, GRAY, SILVER
-
-CARD_SPACING = 8
-EDGE_PADDING = 28
-DECK_GAP = 24
-HAND_SLOTS = 3
-TABLE_SLOTS = 4
-SELECT_LIFT = 12
-SELECT_BORDER = 3
-BUTTON_WIDTH = 110
-BUTTON_HEIGHT = 28
-BUTTON_GAP = 10
+from escoba.actions import Action
+from escoba.graphics.card_sprite import CARD_HEIGHT, CARD_WIDTH, CardSprite, SELECT_LIFT
+from escoba.ui.button import Button
+from escoba.ui.label import Label
 
 def row_lefts(count, x, max_width=None):
-    # left x of each card in a row centered on x; cards overlap to fit max_width
-    step = CARD_WIDTH + CARD_SPACING
-    total = count * CARD_WIDTH + (count - 1) * CARD_SPACING
+    # shrink the gap when the row would overflow max_width
+    spacing = 8
+    step = CARD_WIDTH + spacing
+    total = count * CARD_WIDTH + (count - 1) * spacing
+
     if max_width is not None and total > max_width and count > 1:
         step = (max_width - CARD_WIDTH) / (count - 1)
         total = max_width
+
     start = x - total / 2
     return [int(start + i * step) for i in range(count)]
 
-def draw_card_row(screen, resources, cards, x, y, face_up, slots, selected=(), max_width=None):
-    cards = list(cards)
-    if len(cards) < slots:
-        cards = cards + [None] * (slots - len(cards))
-    if not cards:
-        return
-
-    for i, (card, left) in enumerate(zip(cards, row_lefts(len(cards), x, max_width))):
-        lift = SELECT_LIFT if i in selected else 0
-        pos = (left, int(y) - lift)
-        draw_card(screen, resources, card, pos, face_up)
-        if i in selected:
-            outline = pygame.Rect(pos, (CARD_WIDTH, CARD_HEIGHT)).inflate(SELECT_BORDER * 2, SELECT_BORDER * 2)
-            pygame.draw.rect(screen, YELLOW, outline, width=SELECT_BORDER, border_radius=6)
-
-def row_card_at(pos, count, x, y, max_width=None):
-    # index of the card slot under pos in a row laid out like draw_card_row, or None
-    lefts = row_lefts(count, x, max_width)
-    # check right to left so the card drawn on top wins where cards overlap
-    for i in reversed(range(count)):
-        if pygame.Rect(lefts[i], int(y) - SELECT_LIFT, CARD_WIDTH, CARD_HEIGHT + SELECT_LIFT).collidepoint(pos):
-            return i
-    return None
-
 def table_layout(screen):
-    # deck is pinned to the right edge; the table row stays centered and
-    # grows with the number of cards, overlapping once it would reach the deck
     width, height = screen.get_size()
+    pad, deck_gap = 28, 24
     center_x = width // 2
-    deck_x = width - EDGE_PADDING - CARD_WIDTH
-    max_width = 2 * min(center_x - EDGE_PADDING, deck_x - DECK_GAP - center_x)
+    deck_x = width - pad - CARD_WIDTH
+    max_width = 2 * min(center_x - pad, deck_x - deck_gap - center_x)
     return center_x, height // 2 - CARD_HEIGHT // 2, max_width, deck_x
 
-def button_rect(screen):
-    # small button centered just above your hand (and above a lifted card)
+def action_button_rects(screen):
+    # bottom edge, under the local hand
     width, height = screen.get_size()
-    rect = pygame.Rect(0, 0, BUTTON_WIDTH, BUTTON_HEIGHT)
-    rect.centerx = width // 2
-    rect.bottom = height - CARD_HEIGHT - EDGE_PADDING - SELECT_LIFT - BUTTON_GAP
-    return rect
+    button_w, button_h, gap, pad = 160, 32, 12, 16
+    total = button_w * 2 + gap
+    left = width // 2 - total // 2
+    top = height - pad - button_h
 
-def draw_button(screen, resources, label, enabled):
-    rect = button_rect(screen)
-    fill, ink = (WHITE, BLACK) if enabled else (SILVER, GRAY)
-    pygame.draw.rect(screen, fill, rect, border_radius=6)
-    pygame.draw.rect(screen, ink, rect, width=2, border_radius=6)
-    text = resources.button_font.render(label, True, ink)
-    screen.blit(text, text.get_rect(center=rect.center))
+    discard = pygame.Rect(left, top, button_w, button_h)
+    capture = pygame.Rect(discard.right + gap, top, button_w, button_h)
+    return discard, capture
 
-def hand_card_at(screen, pos):
+def seat_layouts(screen, player_count):
+    # you at the bottom, every opponent shares the top row evenly
     width, height = screen.get_size()
-    return row_card_at(pos, HAND_SLOTS, width // 2, height - CARD_HEIGHT - EDGE_PADDING)
+    pad = 28
+    name_gap = 22
+    hand_span = 3 * CARD_WIDTH + 2 * 8
+    gap = 16
+    button_h = 32
 
-def table_card_at(screen, pos, table_count):
-    x, y, max_width, _ = table_layout(screen)
-    return row_card_at(pos, max(table_count, TABLE_SLOTS), x, y, max_width)
+    south_hand_y = height - pad - button_h - gap - SELECT_LIFT - CARD_HEIGHT
+    south_hand_x = width // 2
+    seats = [{
+        "hand_x": south_hand_x,
+        "hand_y": south_hand_y,
+        "hand_max": hand_span,
+        "pile": pygame.Rect(
+            south_hand_x - hand_span // 2 - gap - CARD_WIDTH,
+            south_hand_y, CARD_WIDTH, CARD_HEIGHT),
+        "hand_face_up": True,
+        "pile_face_up": True,
+        "zone": "hand"
+    }]
 
-def draw_board(screen, resources, table_cards, player_hands, deck_count, selected=(), table_selected=()):
-    width, height = screen.get_size()
-    center_x = width // 2
+    opponents = max(0, player_count - 1)
+    if opponents == 0:
+        return seats
 
+    top_y = pad + name_gap
+    # hand + pile as one block, centered in each equal top column
+    block = hand_span + gap + CARD_WIDTH
+    column = (width - 2 * pad) / opponents
+
+    for index in range(opponents):
+        center = pad + column * (index + 0.5)
+        left = int(center - block / 2)
+        hand_x = left + hand_span // 2
+        seats.append({
+            "hand_x": hand_x,
+            "hand_y": top_y,
+            "hand_max": min(hand_span, int(column) - CARD_WIDTH - gap),
+            "pile": pygame.Rect(left + hand_span + gap, top_y, CARD_WIDTH, CARD_HEIGHT),
+            "hand_face_up": False,
+            "pile_face_up": False,
+            "zone": f"opponent-{index}"
+        })
+
+    return seats
+
+def _card_item(tag, card, slot, *, face_up, selected, zone, index,
+               focusable=True, enabled=True, force_back=False, spawn_slot=None, snap_apply=False):
+    # (tag, create, apply) for Layer.sync — create once, apply every frame
+    def create():
+        origin = spawn_slot if spawn_slot is not None else slot
+        return CardSprite(
+            card, origin, face_up=face_up, selected=selected, zone=zone,
+            index=index, focusable=focusable, enabled=enabled, force_back=force_back)
+
+    def apply(sprite: CardSprite):
+        sprite.zone = zone
+        sprite.index = index
+        sprite.apply(
+            card, slot, face_up=face_up, selected=selected,
+            focusable=focusable, enabled=enabled, force_back=force_back, snap=snap_apply)
+
+    return tag, create, apply
+
+def _button_item(tag, rect, label, enabled, action):
+    def create():
+        button = Button(rect, label, enabled, action)
+        button.tag = tag
+        button.set_goal(rect.topleft, snap=True)
+        return button
+
+    def apply(button: Button):
+        button.label = label
+        button.enabled = enabled
+        button.focusable = enabled
+        button.action = action
+        button.rect.size = (rect.width, rect.height)
+        button.set_goal(rect.topleft)
+
+    return tag, create, apply
+
+def _name_item(tag, text, midbottom):
+    def create():
+        label = Label(text=text, midbottom=midbottom)
+        label.tag = tag
+        return label
+
+    def apply(label: Label):
+        label.text = text
+        label.midbottom = midbottom
+
+    return tag, create, apply
+
+def _row_items(cards, x, y, face_up, slots, zone, selected=(), max_width=None, spawn_slot=None):
+    # empty pads keep row width stable while real cards travel
+    cards = list(cards)
+    empties = max(0, slots - len(cards))
+    total = len(cards) + empties
+    if total == 0:
+        return []
+
+    lefts = row_lefts(total, x, max_width)
+    items = []
+
+    for index, card in enumerate(cards):
+        slot = pygame.Rect(lefts[index], int(y), CARD_WIDTH, CARD_HEIGHT)
+        interactive = zone in ("hand", "table")
+        items.append(_card_item(
+            ("card", card), card, slot, face_up=face_up, selected=index in selected,
+            zone=zone, index=index, focusable=interactive, enabled=interactive,
+            spawn_slot=spawn_slot))
+
+    for index in range(len(cards), total):
+        slot = pygame.Rect(lefts[index], int(y), CARD_WIDTH, CARD_HEIGHT)
+        items.append(_card_item(
+            ("empty", zone, index), None, slot, face_up=True, selected=False,
+            zone=zone, index=index, focusable=False, enabled=False, snap_apply=True))
+
+    return items
+
+def _stack_slots(slot, count, depth=3):
+    # small diagonal cascade, capped so big piles stay compact
+    shown = min(depth, count)
+    return [
+        pygame.Rect(slot.x + index * 3, slot.y + index * 3, CARD_WIDTH, CARD_HEIGHT)
+        for index in range(shown)
+    ]
+
+def _pile_items(captured, slot, zone, face_up=True):
+    shown = list(captured)[-3:]
+    return [
+        _card_item(
+            ("card", card), card, stacked, face_up=face_up, selected=False,
+            zone=zone, index=index, focusable=False, enabled=False, spawn_slot=slot)
+        for index, (card, stacked) in enumerate(zip(shown, _stack_slots(slot, len(shown))))
+    ]
+
+def _deck_items(deck_count, slot):
+    items = []
+    for index, stacked in enumerate(_stack_slots(slot, deck_count)):
+        items.append(_card_item(
+            ("deck", index), None, stacked, face_up=False, selected=False,
+            zone="deck", index=index, focusable=False, enabled=False,
+            force_back=True, snap_apply=True))
+    return items
+
+def board_items(screen, table_cards, player_hands, player_captured, deck_count,
+                hand_selected=(), table_selected=(),
+                *, player_names=(), discard_label="", capture_label="",
+                discard_on=False, capture_on=False, show_buttons=False):
     table_x, table_y, table_max_width, deck_x = table_layout(screen)
+    deck_rect = pygame.Rect(deck_x, table_y, CARD_WIDTH, CARD_HEIGHT)
+    seats = seat_layouts(screen, len(player_hands))
+    items = []
 
-    draw_card_row(
-        screen, resources, table_cards,
-        table_x, table_y,
-        face_up=True, slots=TABLE_SLOTS, selected=table_selected,
-        max_width=table_max_width
-    )
+    items.extend(_row_items(
+        table_cards, table_x, table_y, True, 4, "table",
+        selected=table_selected, max_width=table_max_width, spawn_slot=deck_rect))
 
-    if deck_count > 0:
-        screen.blit(resources.card_back, (deck_x, table_y))
+    items.extend(_deck_items(deck_count, deck_rect))
 
-    draw_card_row(
-        screen, resources, player_hands[0], center_x,
-        height - CARD_HEIGHT - EDGE_PADDING,
-        face_up=True, slots=HAND_SLOTS, selected=selected
-    )
+    for player_index, seat in enumerate(seats):
+        selected = hand_selected if player_index == 0 else ()
+        items.extend(_row_items(
+            player_hands[player_index], seat["hand_x"], seat["hand_y"],
+            seat["hand_face_up"], 3, seat["zone"], selected=selected,
+            max_width=seat["hand_max"], spawn_slot=deck_rect))
+        items.extend(_pile_items(
+            player_captured[player_index], seat["pile"], f"pile-{player_index}",
+            face_up=seat["pile_face_up"]))
 
-    opponents = player_hands[1:]
-    n = len(opponents)
-    if n == 0:
-        return
+        if player_index > 0 and player_index < len(player_names):
+            items.append(_name_item(
+                ("name", player_index),
+                player_names[player_index],
+                (seat["hand_x"], seat["hand_y"] - 6)))
 
-    segment = width / n
-    for i, hand in enumerate(opponents):
-        draw_card_row(
-            screen, resources, hand, 
-            (i + 0.5) * segment, EDGE_PADDING, 
-            face_up=False, slots=HAND_SLOTS
-        )
+    if show_buttons:
+        discard_rect, capture_rect = action_button_rects(screen)
+        items.append(_button_item(("buttons", 0), discard_rect, discard_label, discard_on, Action.DISCARD))
+        items.append(_button_item(("buttons", 1), capture_rect, capture_label, capture_on, Action.CAPTURE))
+
+    return items

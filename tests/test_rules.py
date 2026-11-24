@@ -10,7 +10,7 @@ from escoba.core.rules import (
     play_card,
     score_round,
     score_round_breakdown,
-    start_round,
+    start_round
 )
 
 def make_game(hand, table):
@@ -86,14 +86,14 @@ def test_score_one_point_per_escoba():
 def test_score_most_cards():
     game = make_scored_game([
         [Card(Suit.COPAS, 1), Card(Suit.COPAS, 2)],
-        [Card(Suit.BASTOS, 1)],
+        [Card(Suit.BASTOS, 1)]
     ])
     assert score_round(game) == [1, 0]
 
 def test_score_most_cards_tied():
     game = make_scored_game([
         [Card(Suit.COPAS, 1)],
-        [Card(Suit.BASTOS, 1)],
+        [Card(Suit.BASTOS, 1)]
     ])
     assert score_round(game) == [0, 0]
 
@@ -101,14 +101,14 @@ def test_score_most_oros():
     # same number of cards, but player 1 has more oros
     game = make_scored_game([
         [Card(Suit.OROS, 1), Card(Suit.OROS, 2)],
-        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)],
+        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]
     ])
     assert score_round(game) == [1, 0]
 
 def test_score_most_oros_tied():
     game = make_scored_game([
         [Card(Suit.OROS, 1), Card(Suit.COPAS, 2)],
-        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)],
+        [Card(Suit.OROS, 3), Card(Suit.COPAS, 1)]
     ])
     assert score_round(game) == [0, 0]
 
@@ -116,21 +116,21 @@ def test_score_siete_de_velo():
     # player 1 gets velo + most oros + most sevens, player 2 nothing
     game = make_scored_game([
         [Card(Suit.OROS, 7)],
-        [Card(Suit.COPAS, 1)],
+        [Card(Suit.COPAS, 1)]
     ])
     assert score_round(game) == [3, 0]
 
 def test_score_most_sevens():
     game = make_scored_game([
         [Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 7)],
-        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)],
+        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]
     ])
     assert score_round(game) == [1, 0]
 
 def test_score_most_sevens_tied():
     game = make_scored_game([
         [Card(Suit.COPAS, 7), Card(Suit.COPAS, 1)],
-        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)],
+        [Card(Suit.BASTOS, 7), Card(Suit.BASTOS, 1)]
     ])
     assert score_round(game) == [0, 0]
 
@@ -258,54 +258,57 @@ def test_breakdown_totals_match_score_round():
         split = rng.randint(0, len(cards))
         game = make_scored_game(
             [cards[:split], cards[split:]],
-            escobas_list=[rng.randint(0, 3), rng.randint(0, 3)],
+            escobas_list=[rng.randint(0, 3), rng.randint(0, 3)]
         )
-        totals = [entry["round_total"] for entry in score_round_breakdown(game)]
+        totals = [entry.round_total for entry in score_round_breakdown(game)]
         assert totals == score_round(game)
 
 def test_breakdown_one_player_wins_every_category():
     game = make_scored_game([
         [Card(Suit.OROS, 1), Card(Suit.COPAS, 7), Card(Suit.ESPADAS, 2)],
-        [Card(Suit.BASTOS, 3)],
+        [Card(Suit.BASTOS, 3)]
     ])
     first, second = score_round_breakdown(game)
-    assert first == {
-        "most_cards": 1,
-        "most_oros": 1,
-        "most_sevens": 1,
-        "velo": 0,
-        "escobas": 0,
-        "round_total": 3,
-    }
-    assert second["round_total"] == 0
+    assert first.most_cards == 1
+    assert first.most_oros == 1
+    assert first.most_sevens == 1
+    assert first.velo == 0
+    assert first.escobas == 0
+    assert first.round_total == 3
+    assert second.round_total == 0
 
 def test_breakdown_tie_awards_nobody():
     game = make_scored_game([
         [Card(Suit.OROS, 1), Card(Suit.COPAS, 7)],
-        [Card(Suit.OROS, 2), Card(Suit.BASTOS, 7)],
+        [Card(Suit.OROS, 2), Card(Suit.BASTOS, 7)]
     ])
     for entry in score_round_breakdown(game):
-        assert entry["most_cards"] == 0
-        assert entry["most_oros"] == 0
-        assert entry["most_sevens"] == 0
+        assert entry.most_cards == 0
+        assert entry.most_oros == 0
+        assert entry.most_sevens == 0
 
 def test_breakdown_counts_siete_de_velo():
     game = make_scored_game([
         [Card(Suit.OROS, 7)],
-        [Card(Suit.COPAS, 1)],
+        [Card(Suit.COPAS, 1)]
     ])
     first, second = score_round_breakdown(game)
-    assert first["velo"] == 1
-    assert second["velo"] == 0
+    assert first.velo == 1
+    assert second.velo == 0
 
 def test_breakdown_counts_each_escoba():
     game = make_scored_game([[], []], escobas_list=[2, 0])
     first, second = score_round_breakdown(game)
-    assert first["escobas"] == 2
-    assert first["round_total"] == 2
-    assert second["escobas"] == 0
+    assert first.escobas == 2
+    assert first.round_total == 2
+    assert second.escobas == 0
 
 def test_breakdown_empty_round_is_all_zeros():
     game = make_scored_game([[], []])
     for entry in score_round_breakdown(game):
-        assert all(value == 0 for value in entry.values())
+        assert entry.round_total == 0
+        assert entry.most_cards == 0
+        assert entry.most_oros == 0
+        assert entry.most_sevens == 0
+        assert entry.velo == 0
+        assert entry.escobas == 0

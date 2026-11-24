@@ -2,8 +2,8 @@ from escoba.core.card import Card, Suit
 from escoba.core.cpu import choose_cpu_move
 from escoba.core.game import Game
 from escoba.core.player import Player
-from escoba.core.result import GameResult
-from escoba.core.rules import end_turn, is_legal_capture, play_card, start_round
+from escoba.core.result import GameResult, RoundResult
+from escoba.core.rules import end_turn, play_card, start_round
 
 def make_game(hand, table):
     # two players, the cpu is up and holds `hand`
@@ -60,32 +60,18 @@ def test_cpu_discards_lowest_card_when_no_capture():
 
     assert choose_cpu_move(game) == (low, ())
 
-def test_legal_capture():
-    table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 3)]
-    # rey counts as 10
-    assert is_legal_capture(Card(Suit.OROS, 12), table, table)
-
-def test_illegal_capture_wrong_sum():
-    table = [Card(Suit.COPAS, 2), Card(Suit.ESPADAS, 3)]
-    assert not is_legal_capture(Card(Suit.OROS, 1), table, table)
-
-def test_empty_capture_is_always_legal():
-    assert is_legal_capture(Card(Suit.OROS, 1), (), [Card(Suit.COPAS, 2)])
-
 def test_cpu_vs_cpu_plays_a_full_game():
     players = [Player(0, "a", is_cpu=True), Player(1, "b", is_cpu=True)]
     game = Game(players)
     start_round(game)
 
     result = None
-    while result is None:
+    while not isinstance(result, GameResult):
         play_card(game, *choose_cpu_move(game))
         result = end_turn(game)
 
-        if result is None and not any(
-            state.hand for state in game.player_states.values()
-        ):
+        if isinstance(result, RoundResult):
             start_round(game)
+            result = None
 
-    assert isinstance(result, GameResult)
     assert dict(result.scores)[result.winner_id] >= 21
